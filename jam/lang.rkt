@@ -7,6 +7,8 @@
  "term-to-json.rkt"
  (for-syntax
   syntax/parse
+  syntax/modresolve
+  syntax/location
   racket/syntax))
 
 (provide
@@ -210,8 +212,11 @@
         {~optional {~seq #:translate? translate:expr}
                    #:defaults ([translate #'#t])})
      (define lang-defining-path
-       (resolved-module-path-name
-        (module-path-index-resolve (first (identifier-binding #'name)))))
+       (resolve-module-path-index
+        (first (identifier-binding #'name))
+        (build-path (syntax-source-directory stx)
+                    (syntax-source-file-name stx))))
+
      (unless (complete-path? lang-defining-path)
        (error 'jam-run
               "expected a language name that comes from a file\n\
