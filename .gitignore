@@ -3,3 +3,4 @@ compiled
 __pycache__
 *.pyc
 test/jamtest-*
+examples/pycketlite
