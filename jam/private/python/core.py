@@ -234,7 +234,7 @@ class W_Boolean(W_Term):
   def bool_value(self):
     return self.b
   def to_string(self):
-    return '%s' % self.bool_value()
+    return '#t' if self.bool_value() else '#f'
 
 class W_TermList(W_Term):
   _immutable_fields_ = ['t']
@@ -490,6 +490,14 @@ def json_to_term(v):
     assert tmp_p and tmp_p.is_array, "internal: pair json didn't contain an array"
     [hd, tl] = tmp_p.value_array()
     return make_pair(json_to_term(hd), json_to_term(tl))
+  if "boolean" in obj:
+    tmp_b = obj.get("boolean", None)
+    assert tmp_b and tmp_b.is_bool, "internal: boolean json didn't contain a bool"
+
+    # Not sure how to compare with the singletons json_true/json_false
+    # when the object might be an instance of the Adapter from
+    # pycket_json_adapter... so I think this is the best we can do
+    return make_boolean(tmp_b.tostring() == "true")
   assert False, "internal: couldn't make a term from json"
 
 if we_are_translated():

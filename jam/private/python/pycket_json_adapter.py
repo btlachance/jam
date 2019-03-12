@@ -1,6 +1,8 @@
+import json
+
 class Adapter(object):
   def __init__(self, value):
-    self.is_array = self.is_object = self.is_string = self.is_int = self.is_float = self.is_null = False
+    self.is_array = self.is_object = self.is_string = self.is_int = self.is_float = self.is_null = self.is_bool = False
 
     if value is None:
       self.is_null = True
@@ -10,6 +12,9 @@ class Adapter(object):
       self.is_object = True
     elif isinstance(value, unicode):
       self.is_string = True
+    # Python 2.7: bool => int, so check bool first
+    elif isinstance(value, bool):
+      self.is_bool = True
     elif isinstance(value, int) or isinstance(value, long):
       self.is_int = True
     elif isinstance(value, float):

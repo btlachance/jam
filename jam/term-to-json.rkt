@@ -14,6 +14,8 @@
 
     [(? symbol? s) (hash 'symbol (symbol->string s))]
 
+    [(? boolean? b) (hash 'boolean b)]
+
     ['() 'null]
 
     [(cons t ts) (hash 'pair (list (term-to-json t) (term-to-json ts)))]))
