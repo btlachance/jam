@@ -535,7 +535,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
    runtime-handle
    `(module ,runtime-handle
       (require ,core-handle)
-      (provide nil pair symbol integer boolean
+      (provide nil none pair symbol integer boolean
                hd tl = nil? pair? symbol? integer? boolean? list?
                all? map decompose-values error
                fail-test pass-test done
@@ -552,6 +552,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
       ,(define:* 'JamDone '(prim-class JamDone))
 
       ,(define:* 'nil '(prim-procedure make_nil))
+      ,(define:* 'none '(prim-procedure make_none))
       ,(define:* 'pair '(prim-procedure make_pair))
       ,(define:* 'symbol '(prim-procedure make_symbol))
       ,(define:* 'integer '(prim-procedure make_integer))
@@ -649,6 +650,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
      ir]
 
     ['(nil) (call-runtime 'nil)]
+    [(none*) (call-runtime 'none)]
     [`(pair ,hd ,tl) (call-runtime 'pair (translate hd) (translate tl))]
     [`(symbol ,s) (call-runtime 'symbol (symbol->string s))]
     [`(integer ,n) (call-runtime 'integer n)]

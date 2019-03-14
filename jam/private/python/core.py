@@ -18,6 +18,7 @@ class W_Term(object):
   is_symbol = subclass_responsibility0
   is_integer = subclass_responsibility0
   is_boolean = subclass_responsibility0
+  is_none = subclass_responsibility0
   to_string = subclass_responsibility0
 
   def __init__(self):
@@ -76,12 +77,43 @@ class W_Nil(W_Term):
     return False
   def is_boolean(self):
     return False
+  def is_none(self):
+    return False
   def atoms_equal(self, other):
     return other.equals_nil(self)
   def equals_same(self, t):
     return True
   def to_string(self):
     return "()"
+
+class W_None(W_Term):
+  def is_nil(self):
+    return False
+  def is_pair(self):
+    return False
+  def is_symbol(self):
+    return False
+  def is_integer(self):
+    return False
+  def is_boolean(self):
+    return False
+  def is_none(self):
+    return True
+  def to_string(self):
+    return "#%none"
+  def atoms_equal(self, other):
+    return False
+  def mark_static(self):
+    pass
+W_None.instance = W_None()
+
+def test_none():
+  none = make_none()
+  assert none.to_string()
+  assert none.to_toplevel_string()
+  assert none is make_none()
+  assert not none.can_enter()
+  assert not none.static
 
 class W_Pair(W_Term):
   _immutable_fields_ = ['head', 'tail']
@@ -99,6 +131,8 @@ class W_Pair(W_Term):
   def is_integer(self):
     return False
   def is_boolean(self):
+    return False
+  def is_none(self):
     return False
   def atoms_equal(self, other):
     return False
@@ -133,6 +167,8 @@ class W_Symbol(W_Term):
   def is_integer(self):
     return False
   def is_boolean(self):
+    return False
+  def is_none(self):
     return False
   def atoms_equal(self, other):
     return other.equals_symbol(self)
@@ -172,6 +208,8 @@ class W_Integer(W_Term):
   def is_integer(self):
     return True
   def is_boolean(self):
+    return False
+  def is_none(self):
     return False
   def atoms_equal(self, other):
     return other.equals_integer(self)
@@ -227,6 +265,8 @@ class W_Boolean(W_Term):
     return False
   def is_boolean(self):
     return True
+  def is_none(self):
+    return False
   def atoms_equal(self, other):
     return other.equals_boolean(self)
   def equals_same(self, b):
@@ -252,6 +292,8 @@ class W_TermList(W_Term):
     return self.t.is_integer()
   def is_boolean(self):
     return self.t.is_boolean()
+  def is_none(self):
+    return self.t.is_none()
   def atoms_equal(self, other):
     return self.t.atoms_equal(other)
 
@@ -288,6 +330,9 @@ def test_W_TermList():
 
 def make_nil():
   return W_Nil()
+
+def make_none():
+  return W_None.instance
 
 def make_pair(hd, tl):
   return W_Pair(hd, tl)
@@ -337,6 +382,9 @@ def is_integer(t):
 
 def is_boolean(t):
   return t.is_boolean()
+
+def is_none(t):
+  return t.is_none()
 
 def is_list(t):
   if t.is_nil():

@@ -103,6 +103,7 @@
 (define-ir evaluator (name transition load unload control-string))
 (define-ir py-from (modname imports))
 (define-ir print-term (ir))
+(define-ir none ())
 
 (module+ test
   (require (submod "..") rackunit)
@@ -136,6 +137,7 @@
 ;; an ir is one of
 ;; - var
 ;; - '(nil)
+;; - (none)
 ;; - `(pair ,ir ,ir)
 ;; - `(symbol ,symbol)
 ;; - `(integer ,integer)
