@@ -7,11 +7,11 @@ def bail(s):
 
 @specialize.call_location()
 def subclass_responsibility0(self):
-  assert False, "internal: Subclass responsibility"
+  bail("internal: Subclass responsibility")
 
 @specialize.call_location()
 def subclass_responsibility1(self, v):
-  assert False, "internal: Subclass responsibility"
+  bail("internal: Subclass responsibility")
 
 class W_Term(object):
   _immutable_fields_ = ['static']
@@ -30,13 +30,13 @@ class W_Term(object):
   def __nonzero__(self):
     return True
   def __len__(self):
-    assert False, "internal: Can't take the length of a non-TermList"
+    bail("internal: Can't take the length of a non-TermList")
   def __iter__(self):
-    assert False, "internal: Can't iterate a non-TermList"
+    bail("internal: Can't iterate a non-TermList")
 
   atoms_equal = subclass_responsibility1
   def equals_same(self, t):
-    assert False, "internal: Doesn't participate in the atoms_equal protocol"
+    bail("internal: Doesn't participate in the atoms_equal protocol")
 
   def equals_nil(self, o):
     return self.is_nil() and o.equals_same(self)
@@ -48,15 +48,15 @@ class W_Term(object):
     return self.is_boolean() and b.equals_same(self)
 
   def int_value(self):
-    assert False, "internal: Not an integer"
+    bail("internal: Not an integer")
   def sym_value(self):
-    assert False, "internal: Not a symbol"
+    bail("internal: Not a symbol")
   def bool_value(self):
-    assert False, "internal: Not a boolean"
+    bail("internal: Not a boolean")
   def hd(self):
-    assert False, "internal: Not a pair"
+    bail("internal: Not a pair")
   def tl(self):
-    assert False, "internal: Not a pair"
+    bail("internal: Not a pair")
 
   def mark_static(self):
     self.static = True
@@ -66,7 +66,7 @@ class W_Term(object):
     return self.to_string()
 
 def test_responsibility():
-  with pytest.raises(AssertionError):
+  with pytest.raises(JamError):
     W_Term().is_nil()
 
 class W_Nil(W_Term):
@@ -224,19 +224,22 @@ class W_Integer(W_Term):
     return '%s' % self.int_value()
 
   def add(self, other):
-    assert isinstance(other, W_Integer)
+    if not isinstance(other, W_Integer):
+      bail("add: not two integers")
     return self.add_same(other)
   def add_same(self, other):
     return W_Integer(self.n + other.n)
 
   def subtract(self, other):
-    assert isinstance(other, W_Integer)
+    if not isinstance(other, W_Integer):
+      bail("subtract: not two integers")
     return self.subtract_same(other)
   def subtract_same(self, other):
     return W_Integer(self.n - other.n)
 
   def multiply(self, other):
-    assert isinstance(other, W_Integer)
+    if not isinstance(other, W_Integer):
+      bail("multiply: not two integers")
     return self.multiply_same(other)
   def multiply_same(self, other):
     return W_Integer(self.n * other.n)
@@ -444,7 +447,8 @@ def test_izip2():
 def decompose_values(levels, terms):
   levels = [v.int_value() for v in W_TermList(levels)]
   terms = [t for t in W_TermList(terms)]
-  assert equal_lengths(levels, terms), "Ellipses used on unequal-length lists"
+  if not equal_lengths(levels, terms):
+    bail("Ellipses used on unequal-length lists")
   decomposed = []
   while not stop_now(levels, terms):
     current_decomp = []
@@ -500,10 +504,10 @@ def stop_now(levels, terms):
     if level == 0:
       continue
     return term.is_nil()
-  assert False, "internal: stop_now needs at least one non-atomic term"
+  bail("internal: stop_now needs at least one non-atomic term")
 
 def error():
-  assert False, "Error raised (did pattern matching fail"
+  bail("Error raised (did pattern matching fail")
 
 class ExnTestFailure(Exception):
   def __init__(self, s):
@@ -522,30 +526,35 @@ def pass_test():
 def json_to_term(v):
   if v.is_null:
     return make_nil()
-  assert v.is_object
+  if not v.is_object:
+    bail("non-null json was not an object")
   obj = v.value_object()
   if "integer" in obj:
     tmp_i = obj.get("integer", None)
-    assert tmp_i and tmp_i.is_int, "internal: integer json didn't contain an int"
+    if not (tmp_i and tmp_i.is_int):
+      bail("internal: integer json didn't contain an int")
     return make_integer(tmp_i.value_int())
   if "symbol" in obj:
     tmp_s = obj.get("symbol", None)
-    assert tmp_s and tmp_s.is_string, "internal: symbol json didn't contain a string"
+    if not(tmp_s and tmp_s.is_string):
+      bail("internal: symbol json didn't contain a string")
     return make_symbol(tmp_s.value_string())
   if "pair" in obj:
     tmp_p = obj.get("pair", None)
-    assert tmp_p and tmp_p.is_array, "internal: pair json didn't contain an array"
+    if not(tmp_p and tmp_p.is_array):
+      bail("internal: pair json didn't contain an array")
     [hd, tl] = tmp_p.value_array()
     return make_pair(json_to_term(hd), json_to_term(tl))
   if "boolean" in obj:
     tmp_b = obj.get("boolean", None)
-    assert tmp_b and tmp_b.is_bool, "internal: boolean json didn't contain a bool"
+    if not(tmp_b and tmp_b.is_bool):
+      bail("internal: boolean json didn't contain a bool")
 
     # Not sure how to compare with the singletons json_true/json_false
     # when the object might be an instance of the Adapter from
     # pycket_json_adapter... so I think this is the best we can do
     return make_boolean(tmp_b.tostring() == "true")
-  assert False, "internal: couldn't make a term from json"
+  bail("internal: couldn't make a term from json")
 
 if we_are_translated():
   from pycket import pycket_json
@@ -578,8 +587,7 @@ class W_Environment(W_Term):
 
 class W_EmptyEnvironment(W_Environment):
   def lookup(self, y):
-    print "Variable %s not bound" % y.to_string()
-    assert False
+    bail("Varaible %s not bound" % y.to_string())
   def is_bound(self, y):
     return False
 
