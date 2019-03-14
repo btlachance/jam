@@ -2,6 +2,9 @@ import pytest
 from rpython.rlib import jit
 from rpython.rlib.objectmodel import we_are_translated, specialize
 
+def bail(s):
+  raise JamError(s)
+
 @specialize.call_location()
 def subclass_responsibility0(self):
   assert False, "internal: Subclass responsibility"
@@ -648,6 +651,10 @@ def environment_empty(t):
 class JamDone(Exception):
   def __init__(self, v):
     self.v = v
+
+class JamError(Exception):
+  def __init__(self, s):
+    self.s = s
 
 def done(v):
   raise JamDone(v)
