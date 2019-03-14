@@ -145,9 +145,10 @@ class W_Pair(W_Term):
     return self.tail
 
   def mark_static(self):
-    W_Term.mark_static(self)
     self.head.mark_static()
     self.tail.mark_static()
+    if self.head.static and self.tail.static:
+      W_Term.mark_static(self)
 
   def to_string(self):
     return "(%s %s)" % (self.head.to_string(), self.tail.to_string())
@@ -318,8 +319,9 @@ class W_TermList(W_Term):
     return n
 
   def mark_static(self):
-    W_Term.mark_static(self)
     self.t.mark_static()
+    if self.t.static:
+      W_Term.mark_static(self)
 
   def to_string(self):
     return self.t.to_string()
