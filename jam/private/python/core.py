@@ -608,28 +608,78 @@ class W_SingleEnvironment(W_Environment):
     return self.env.is_bound(y)
 
 class W_MultipleEnvironment(W_Environment):
+  _immutable_fields_ = ['xs', 'vs[*]', 'env']
   def __init__(self, xs, vs, env):
     W_Environment.__init__(self)
-    self.xs = W_TermList(xs)
-    self.vs = W_TermList(vs)
+    self.xs = xs
+    self.vs = [v for v in W_TermList(vs)]
     self.env = env
 
   @jit.unroll_safe
   def lookup(self, y):
-    for x, v in izip2(self.xs, self.vs):
+    # It's only safe to promote xs itself, and not something like a
+    # dictionary allocated during __init__ with name-index
+    # associations, because the environment might not escape, leading
+    # to us promoting a virtual. We technically should be checking
+    # that self.xs is static since there's nothing stopping a
+    # programmer from constructing new lists of variables and using
+    # that to make an environment, and we don't hash-cons arbitrary
+    # lists of variables
+    xs = jit.promote(self.xs)
+    index, at = -1, 0
+
+    for x in W_TermList(xs):
       if x.atoms_equal(y):
-        return v
-    return self.env.lookup(y)
+        index = at
+        break
+      at = at + 1
+
+    if index == -1:
+      return self.env.lookup(y)
+    else:
+      return self.vs[index]
 
   @jit.unroll_safe
   def is_bound(self, y):
-    for x in self.xs:
+    xs = jit.promote(self.xs)
+
+    for x in W_TermList(xs):
       if x.atoms_equal(y):
         return True
     return self.env.is_bound(y)
 
+def test_env():
+  empty = W_EmptyEnvironment()
+  x, y = make_symbol('x'), make_symbol('y')
+  xs0 = term_list([x, y])
+  vs0 = term_list([make_integer(0), make_integer(1)])
+  env0 = W_MultipleEnvironment(xs0, vs0, empty)
+
+  assert not empty.is_bound(x)
+  assert env0.is_bound(y)
+  assert not env0.is_bound(make_symbol('z'))
+  assert env0.lookup(x).int_value() == 0
+  assert env0.lookup(y).int_value() == 1
+
 def is_environment(v):
   return isinstance(v, W_Environment)
+
+def test_envwrongnumber():
+  empty = W_EmptyEnvironment()
+  x, y = make_symbol('x'), make_symbol('y')
+  v, w = make_integer(0), make_integer(1)
+
+  xs0 = term_list([x, y])
+  vs0 = term_list([v])
+
+  xs1 = term_list([x])
+  vs1 = term_list([v, w])
+
+  with pytest.raises(JamError):
+    environment_extend(term_list([empty, xs0, vs0]))
+
+  with pytest.raises(JamError):
+    environment_extend(term_list([empty, xs1, vs1]))
 
 @jit.unroll_safe
 def environment_lookup(t):
@@ -649,6 +699,8 @@ def environment_extend1(t):
 @jit.unroll_safe
 def environment_extend(t):
   [env, xs, vs] = [x for x in W_TermList(t)]
+  if not len(W_TermList(xs)) == len(W_TermList(vs)):
+    bail("can't extend environment with two lists of unequal length")
   return W_MultipleEnvironment(xs, vs, env)
 
 @jit.unroll_safe
@@ -656,6 +708,15 @@ def environment_empty(t):
   [] = [x for x in W_TermList(t)]
   return W_EmptyEnvironment()
 
+def test_env_metafunction():
+  empty = W_EmptyEnvironment()
+  x, y = make_symbol('x'), make_symbol('y')
+  xs0 = term_list([x, y])
+  vs0 = term_list([make_integer(4), make_integer(3)])
+
+  env0 = environment_extend(term_list([empty, xs0, vs0]))
+  assert env0.lookup(y).int_value() == 3
+  assert env0.lookup(x).int_value() == 4
 
 class JamDone(Exception):
   def __init__(self, v):
