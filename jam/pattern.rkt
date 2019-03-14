@@ -539,7 +539,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                hd tl = nil? pair? symbol? integer? boolean? list?
                all? map decompose-values error
                fail-test pass-test done
-               ExnTestSuccess ExnTestFailure JamDone)
+               ExnTestSuccess ExnTestFailure JamDone JamError)
 
       ,(define:* 'Term '(prim-class W_Term))
       ,(define:* 'Nil '(prim-class W_Nil))
@@ -550,6 +550,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
       ,(define:* 'ExnTestSuccess '(prim-class ExnTestSuccess))
       ,(define:* 'ExnTestFailure '(prim-class ExnTestFailure))
       ,(define:* 'JamDone '(prim-class JamDone))
+      ,(define:* 'JamError '(prim-class JamError))
 
       ,(define:* 'nil '(prim-procedure make_nil))
       ,(define:* 'none '(prim-procedure make_none))

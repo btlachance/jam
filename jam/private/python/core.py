@@ -581,7 +581,8 @@ class W_Environment(W_Term):
     return False
   def atoms_equal(self, other):
     return False
-
+  def to_string(self):
+    return "#%env"
   def mark_static(self):
     pass
 
