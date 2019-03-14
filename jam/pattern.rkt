@@ -421,10 +421,9 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 
 (define (compile-clause lang-name p t ws
                         #:arg-name [arg-name #f]
-                        #:extra-arg-names [extra-arg-names '()]
                         #:with-match [with-match values]
                         #:no-match [no-clause-match '(error)])
-  (define args (cons (or arg-name (gensym 'cterm)) extra-arg-names))
+  (define args (list (or arg-name (gensym 'cterm))))
   (define final-dest (gensym 'result))
   (define where-tmps (for/list ([_ ws]) (gensym 'tmp)))
 
@@ -1015,8 +1014,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
    control-string?
    t
    ws
-   #:extra-arg-names '(orig-c)
-   #:no-match (lexical-var* 'orig-c)))
+   #:no-match (none*)))
 
 (define (maybe-unload lang-name final? result ws)
   (compile-clause

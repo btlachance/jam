@@ -31,30 +31,63 @@
       (define driver-class
         `(,(get-annotation t 'rpython-jit-prefix) dot JitDriver))
       (define driver-name (pythonify-name (format-symbol "~a-driver" name)))
+
+      ;; XXX making a module-var+call out of thin air is a hack and
+      ;; duplicates what's in pattern.rkt; this should be passed in on
+      ;; an annotated ir or similar
+      (define none (ir->py-exp `(call ,(module-var* 'runtime 'make_none))))
+
       (define done-exception (ir->py-exp (get-annotation t 'jam-done-exn)))
       `(do (,driver-name assign (app ,driver-class
-                                     (reds binop = (list "t"))
-                                     (greens binop = (list "c"))
+                                     (reds binop = (list "t" "tmp"))
+                                     (greens binop = (list "c" "prev_c"))
                                      (get_printable_location
                                       binop =
-                                      (lambda (c) (app (c dot to_toplevel_string))))))
+                                      (lambda (c prev_c) (app (c dot to_toplevel_string))))))
            (def ,name (t)
-             (t assign (app ,(pythonify-name (ir->py-exp load)) t))
-             (c assign t)
-             (app (t dot mark_static))
              (try
-              (while #t
-                (app (,driver-name dot jit_merge_point)
-                     (c binop = c)
-                     (t binop = t))
-                (app ,(pythonify-name (ir->py-exp maybe-unload)) t)
-                (t assign (app ,(pythonify-name (ir->py-exp transition)) t))
-                (c assign (app ,(pythonify-name (ir->py-exp control-string)) t c))
-                (if (app (c dot can_enter))
-                    (app (,driver-name dot can_enter_jit)
-                         (c binop = c)
-                         (t binop = t))))
-              (,done-exception as d (return (d dot v))))))]
+              (do
+                (t assign (app ,(pythonify-name (ir->py-exp load)) t))
+                (tmp assign ,none)
+                (c assign ,none)
+                (prev_c assign ,none)
+
+                (app (t dot mark_static))
+                (while #t
+                  (app (,driver-name dot jit_merge_point)
+                       (c binop = c)
+                       (prev_c binop = prev_c)
+                       (t binop = t)
+                       (tmp binop = tmp))
+                  (app ,(pythonify-name (ir->py-exp maybe-unload)) t)
+                  (t assign (app ,(pythonify-name (ir->py-exp transition)) t))
+
+                  (tmp assign (app ,(pythonify-name (ir->py-exp control-string)) t))
+                  (if (tmp dot static)
+                      (do (if (unop not (app (c dot is_none)))
+                              (prev_c assign c))
+                          (c assign tmp))
+                      (c assign ,none))
+
+                  (if (app (c dot can_enter))
+                      (app (,driver-name dot can_enter_jit)
+                           (c binop = c)
+                           (prev_c binop = prev_c)
+                           (t binop = t)
+                           (tmp binop = tmp)))))
+              (,done-exception as d (return (d dot v)))
+              (,(ir->py-exp (module-var* 'runtime 'JamError))
+               as e
+               (do (app print ("Jam Error: %s" binop % (e dot s)))
+                   (if t
+                       (app print ("Current term: %s" binop % (app (t dot to_toplevel_string))))
+                       (app print "No current term"))
+                   (return ,none)))
+              (Exception
+               as e
+               (do (app print ("Internal Error: %s" binop % e))
+                   (app print ("Current term:\n%s" binop % (app (t dot to_toplevel_string))))
+                   (return ,none))))))]
 
      [ir (ir->py-stmt ir)]))
 
