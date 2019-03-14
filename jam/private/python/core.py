@@ -338,7 +338,6 @@ def is_integer(t):
 def is_boolean(t):
   return t.is_boolean()
 
-@jit.unroll_safe
 def is_list(t):
   if t.is_nil():
     return True
@@ -352,7 +351,6 @@ def is_list(t):
 def print_term(t):
   print t.to_toplevel_string()
 
-@jit.unroll_safe
 def all_terms(pred, terms):
   for term in W_TermList(terms):
     if not pred(term):
@@ -427,7 +425,6 @@ def test_decompose_values():
 
 
 # INV: levels contains at least one non-atomic level
-@jit.unroll_safe
 def equal_lengths(levels, terms):
   length = -1
   for level, term in izip2(levels, terms):
@@ -447,7 +444,6 @@ def test_equal_lengths():
   levels = [0, 1]
   assert equal_lengths(levels, terms)
 
-@jit.unroll_safe
 def stop_now(levels, terms):
   for level, term in izip2(levels, terms):
     if level == 0:
