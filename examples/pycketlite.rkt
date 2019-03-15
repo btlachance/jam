@@ -81,9 +81,14 @@
 (module+ test
   (current-test-language pl)
   (test-equal (run-eval (+ 1 2)) 3)
+  (test-equal (run-eval ((lambda (x) x) 10)) 10)
+  (test-equal (run-eval (((lambda (x) (lambda (y) x)) 5) 6))
+              5)
+  (test-equal (run-eval ((lambda (f x) (f x)) zero? 0)) #t)
+  (test-equal (run-eval ((lambda (f x) (f x)) (lambda (n) (+ n 1)) 0)) 1)
 
   (test-equal (run-eval
-               ((lambda (fib) (fib fib 10))
+               ((lambda (fib) (fib fib 8))
                 (lambda (rec n)
                   (if (zero? n)
                       0
@@ -91,7 +96,16 @@
                           1
                           (+ (rec rec (- n 1))
                              (rec rec (- n 2))))))))
-              55)
+              21)
+
+  (test-equal (run-eval
+               ((lambda (fact) (fact fact 10))
+                (lambda (rec n)
+                  (if (zero? n)
+                      1
+                      (* n (rec rec (- n 1)))))))
+              3628800)
+
   (jam-test))
 
 (module+ main
