@@ -12,7 +12,7 @@
              prim+ prim- prim* primzero?)
 
   (V ::= {env v})
-  (k ::= mt (fn env (e ...) (V ...) k) (sel env e e k)))
+  (k ::= mt (appk env (e ...) (V ...) k) (ifk env e e k)))
 
 (define-metafunction pl
   [(init-env)
@@ -24,22 +24,22 @@
 
 (define-metafunction pl
   [(apply-op (lambda (x ...) e) env (V ...))
-   {(env-extend env (x ...) (V ...)) e}]
+   (ret (env-extend env (x ...) (V ...)) e)]
 
   [(apply-op prim+ _ ({_ integer_1} {_ integer_2}))
-   {(env-empty) (integer-add integer_1 integer_2)}]
+   (ret (integer-add integer_1 integer_2))]
 
   [(apply-op prim- _ ({_ integer_1} {_ integer_2}))
-   {(env-empty) (integer-subtract integer_1 integer_2)}]
+   (ret (integer-subtract integer_1 integer_2))]
 
   [(apply-op prim* _ ({_ integer_1} {_ integer_2}))
-   {(env-empty) (integer-multiply integer_1 integer_2)}]
+   (ret (integer-multiply integer_1 integer_2))]
 
   [(apply-op primzero? _ ({_ 0}))
-   {(env-empty) #t}]
+   (ret #t)]
 
   [(apply-op primzero? _ ({_ v}))
-   {(env-empty) #f}])
+   (ret #f)])
 
 (define-transition pl
   step
@@ -48,24 +48,28 @@
        (where {env_v v} (env-lookup env x))]
 
   [--> ((e e_args ...) env k)
-       (e env (fn env (e_args ...) () k))]
+       (e env (appk env (e_args ...) () k))]
 
   [--> ((if e_test e_then e_else) env k)
-       (e_test env (sel env e_then e_else k))]
+       (e_test env (ifk env e_then e_else k))]
 
-  [--> (v env_v (fn env (e_arg e_args ...) (V ...) k))
-       (e_arg env (fn env (e_args ...) ({env_v v} V ...) k))]
+  [--> (v env_v (appk env (e_arg e_args ...) (V ...) k))
+       (e_arg env (appk env (e_args ...) ({env_v v} V ...) k))]
 
-  [--> (v env_v (fn _ () (V ...) k))
+  [--> (v env_v (appk _ () (V ...) k))
        (e env_e k)
        (where ({env_op v_op} V ...) (reverse ({env_v v} V ...)))
-       (where {env_e e} (apply-op v_op env_op (V ...)))]
+       (where (env_e e) (apply-op v_op env_op (V ...)))]
 
-  [--> (#f _ (sel env _ e_else k))
+  [--> (#f _ (ifk env _ e_else k))
        (e_else env k)]
 
-  [--> (v _ (sel env e_then _ k))
+  [--> (v _ (ifk env e_then _ k))
        (e_then env k)])
+
+(define-metafunction pl
+  [(ret v) ((env-empty) v)]
+  [(ret env e) (env e)])
 
 (define-evaluator pl
   eval
