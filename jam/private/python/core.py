@@ -245,14 +245,17 @@ class W_Integer(W_Term):
   def multiply_same(self, other):
     return W_Integer(self.n * other.n)
 
+@jit.unroll_safe
 def integer_add0(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return v1.add(v2)
 
+@jit.unroll_safe
 def integer_subtract0(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return v1.subtract(v2)
 
+@jit.unroll_safe
 def integer_multiply0(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return v1.multiply(v2)

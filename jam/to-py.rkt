@@ -44,7 +44,7 @@
                                      (get_printable_location
                                       binop =
                                       (lambda (c prev_c) (app (c dot to_toplevel_string))))))
-           (def ,name (t)
+           (def ,(pythonify-name name) (t)
              (try
               (do
                 (t assign (app ,(pythonify-name (ir->py-exp load)) t))
