@@ -111,9 +111,43 @@
 (module+ main
   (require syntax/location)
   (define dest (build-path (syntax-source-directory #'here) "pycketlite"))
+  (define interpreter-mode (make-parameter 'plain))
+  (define run (make-parameter #f))
+  (define build? (make-parameter #f))
 
-  (jam-build pl eval
-    #:dest/delete dest)
+  (command-line
+   #:program "pycketlite"
 
-  (jam-run pl eval
-    #:path dest))
+   #:once-any
+   ["--translated" "Use the translated interpreter"
+                  (interpreter-mode 'translate)]
+   ["--plain" "Use the untranslated interpreter (default)"
+              (interpreter-mode 'plain)]
+
+   #:once-any
+   ;; TODO support running a program at a particular path. If we want
+   ;; to cache the term->json process, though, then we need to either
+   ;; change the evaluation handler or not go through the REPL
+   ["--stdin" "Run a program read from stdin"
+              (run 'stdin)]
+
+   #:once-each
+   ["--build" "Build the interpreter"
+              (build? #t)])
+
+  (when (and (not (build?)) (not (run)))
+    (error 'pycketlite "Must do at least one of running or building an interpreter"))
+
+  (define translate? (equal? (interpreter-mode) 'translate))
+
+  (when (build?)
+    (jam-build pl eval
+       #:dest/delete dest
+       #:translate? translate?))
+
+  (match (run)
+    ['stdin
+     (jam-run pl eval
+       #:path dest
+       #:translate? translate?)]
+    [#f (void)]))
