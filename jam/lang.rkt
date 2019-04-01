@@ -244,7 +244,15 @@
                               [current-read-interaction jam/read-interaction-handler]
                               [current-eval (jam/evaluation-handler evaluator)])
                  (read-eval-print-loop)
-                 (newline))]
+
+                 ;; Using the prompt means likely an interactive
+                 ;; session, and exiting an interactive session
+                 ;; usually happens after printing the prompt (by
+                 ;; sending eof). So, only print a newline after
+                 ;; exiting the repl from a likely-interactive session
+                 #,(if (eq? mode 'run)
+                       #'(newline)
+                       #'(void)))]
             ['build #'(void)]))))
 
 (define-syntax (jam-run stx)

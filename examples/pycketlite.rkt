@@ -127,8 +127,11 @@
    #:once-any
    ;; TODO support running a program at a particular path. If we want
    ;; to cache the term->json process, though, then we need to either
-   ;; change the evaluation handler or not go through the REPL
-   ["--stdin" "Run a program read from stdin"
+   ;; change the evaluation handler or not go through the REPL (which
+   ;; is hard-coded into jam-run) since it does its own term->json
+   ["--repl" "Start a REPL where each input is run run as a separate program"
+             (run 'repl)]
+   ["--stdin" "Read a single program from stdin, and run it"
               (run 'stdin)]
 
    #:once-each
@@ -136,7 +139,9 @@
               (build? #t)])
 
   (when (and (not (build?)) (not (run)))
-    (error 'pycketlite "Must do at least one of running or building an interpreter"))
+    (raise-user-error
+     'pycketlite
+     "Must at least run or build an interpreter"))
 
   (define translate? (equal? (interpreter-mode) 'translate))
 
@@ -146,8 +151,18 @@
        #:translate? translate?))
 
   (match (run)
-    ['stdin
+    ['repl
      (jam-run pl eval
        #:path dest
        #:translate? translate?)]
+    ['stdin
+     (parameterize* ([read-accept-reader #f]
+                     [read-accept-lang #f])
+       (define input (read))
+       (unless (eof-object? input)
+         (parameterize ([current-input-port (open-input-string (~a input))])
+           (jam-run pl eval
+             #:path dest
+             #:translate? translate?
+             #:prompt? #f))))]
     [#f (void)]))
