@@ -110,7 +110,10 @@
 
 (module+ main
   (require syntax/location)
-  (define dest (syntax-source-directory #'here))
+  (define dest (build-path (syntax-source-directory #'here) "pycketlite"))
+
+  (jam-build pl eval
+    #:dest/delete dest)
+
   (jam-run pl eval
-    #:dest/delete (build-path dest "pycketlite")
-    #:translate? #f))
+    #:path dest))

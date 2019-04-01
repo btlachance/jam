@@ -20,6 +20,7 @@
  test-equal
  test-not-equal
  jam-test
+ jam-build
  jam-run)
 
 (define current-test-language (make-parameter #f))
@@ -204,39 +205,78 @@
           (displayln printed)
           (on-fail))))))
 
-(require (for-syntax syntax/location racket/list))
+(begin-for-syntax
+  (require syntax/location)
+  (define (name-defining-path name stx who)
+    (define path
+      (resolve-module-path-index
+       (car (identifier-binding name))
+       (build-path (syntax-source-directory stx)
+                   (syntax-source-file-name stx))))
+
+    (unless (complete-path? path)
+      (error who
+             "expected a language name that comes from a file\n\
+  name: ~a\n\
+  comes from: ~a" (syntax-e name) path))
+
+    path)
+
+  (define (do-run/build name evaluator-name dest
+                        defining-path
+                        mode translate? build?)
+    #`(begin
+        (define evaluator
+          (make-evaluator #,name '#,evaluator-name #,dest
+                          ;; XXX This is an incomplete list of deps
+                          ;; since it doesn't even track jam itself.
+                          ;; But it's good enough to start.
+                          (list #,defining-path)
+                          #:translate? #,translate?
+                          #:build? #,build?))
+        #,(match mode
+            [(or 'run 'run-no-prompt)
+             (define prompt
+               (if (eq? mode 'run)
+                   "> "
+                   ""))
+             #`(parameterize ([current-prompt-read (jam/prompt-read-handler #,prompt)]
+                              [current-read-interaction jam/read-interaction-handler]
+                              [current-eval (jam/evaluation-handler evaluator)])
+                 (read-eval-print-loop))]
+            ['build #'(void)]))))
+
 (define-syntax (jam-run stx)
   (syntax-parse stx
     [(_ name:id e-name:id
+        #:path path
+        {~alt
+         {~optional {~seq #:translate? translate?:expr}
+                    #:defaults ([translate? #'#f])}
+         {~optional {~seq #:prompt? prompt?:expr}
+                    #:defaults ([prompt? #'#t])}} ...)
+     (define lang-defining-path (name-defining-path #'name stx 'jam-run))
+     (do-run/build #'name #'e-name #'path
+                   lang-defining-path
+                   (if (syntax-e #'prompt?)
+                       'run
+                       'run-no-prompt)
+                   #'translate? #f)]))
+
+(define-syntax (jam-build stx)
+  (syntax-parse stx
+    [(_ name:id e-name:id
         #:dest/delete dest:expr
-        {~optional {~seq #:translate? translate:expr}
-                   #:defaults ([translate #'#t])})
-     (define lang-defining-path
-       (resolve-module-path-index
-        (first (identifier-binding #'name))
-        (build-path (syntax-source-directory stx)
-                    (syntax-source-file-name stx))))
-
-     (unless (complete-path? lang-defining-path)
-       (error 'jam-run
-              "expected a language name that comes from a file\n\
-  name: ~a\n\
-  comes from: ~a" (syntax-e #'name) lang-defining-path))
-
-     #`(begin
-         (define evaluator
-           (make-evaluator name 'e-name dest
-                           ;; XXX This is an incomplete list of deps
-                           ;; since it doesn't even track jam itself.
-                           ;; But it's good enough to start.
-                           (list #,lang-defining-path)
-                           #:translate? translate))
-         (parameterize ([current-read-interaction jam/read-interaction-handler]
-                        [current-eval (jam/evaluation-handler evaluator)])
-           (read-eval-print-loop)))]))
+        {~optional {~seq #:translate? translate?:expr}
+                   #:defaults ([translate? #'#f])})
+     (define lang-defining-path (name-defining-path #'name stx 'jam-build))
+     (do-run/build #'name #'e-name #'dest
+                   lang-defining-path
+                   'build #'translate? #t)]))
 
 (define (make-evaluator lang name destdir deps
-                        #:translate? [translate? #t])
+                        #:translate? [translate? #t]
+                        #:build? [build? #t])
   (define-values (target in-modules-dir evaluator)
     (if translate?
         (values (build-path destdir (~a name))
@@ -251,21 +291,22 @@
                   (define pypy (find-executable-path "pypy"))
                   (system* pypy target)))))
 
-  (parameterize ([make-print-checking #f])
-    (make/proc
-     `((,target
-        ,deps
-        ,(lambda ()
-           (when (directory-exists? destdir)
-             (delete-directory/files destdir))
+  (when build?
+    (parameterize ([make-print-checking #f])
+      (make/proc
+       `((,target
+          ,deps
+          ,(lambda ()
+             (when (directory-exists? destdir)
+               (delete-directory/files destdir))
 
-           (define mods (lang-modules lang #:main-evaluator name))
-           (write-modules mods destdir)
+             (define mods (lang-modules lang #:main-evaluator name))
+             (write-modules mods destdir)
 
-           (define env (environment-variables-copy (current-environment-variables)))
-           (parameterize ([current-environment-variables env]
-                          [current-directory destdir])
-             (in-modules-dir)))))))
+             (define env (environment-variables-copy (current-environment-variables)))
+             (parameterize ([current-environment-variables env]
+                            [current-directory destdir])
+               (in-modules-dir))))))))
   evaluator)
 
 (define ((jam/evaluation-handler evaluator) form)
@@ -276,6 +317,11 @@
   (close-output-port sink)
   (parameterize ([current-input-port src])
     (void (evaluator))))
+
+(define ((jam/prompt-read-handler prompt-str))
+  (display prompt-str)
+  (let ([in ((current-get-interaction-input-port))])
+    ((current-read-interaction) (object-name in) in)))
 
 (define (jam/read-interaction-handler src in)
   (parameterize ([read-accept-reader #f]
