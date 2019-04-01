@@ -243,7 +243,8 @@
              #`(parameterize ([current-prompt-read (jam/prompt-read-handler #,prompt)]
                               [current-read-interaction jam/read-interaction-handler]
                               [current-eval (jam/evaluation-handler evaluator)])
-                 (read-eval-print-loop))]
+                 (read-eval-print-loop)
+                 (newline))]
             ['build #'(void)]))))
 
 (define-syntax (jam-run stx)
