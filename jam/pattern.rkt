@@ -592,7 +592,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
           (define ir
             (proc* '() `(if ,cond
                             (call ,(internal-ref 'pass-test 'pass_test))
-                            (call ,(internal-ref 'fail-test 'fail_test) ,test-message))))
+                            (call ,(internal-ref 'fail-test 'fail_test) ,test-message ,(none*)))))
           (annotate-test-exceptions (test* ir))))))
 
 (define (main-module ev-name
@@ -705,7 +705,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 
     ['(error) (call-runtime 'error)]
 
-    [(fail-test* s) (call-runtime 'fail-test s)]
+    [(fail-test* s wit) (call-runtime 'fail-test s (translate wit))]
     [(pass-test*) (call-runtime 'pass-test)]
 
     [(done* ir) (call-runtime 'done ir)]
@@ -1027,11 +1027,17 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 
 ;; compile-test : symbol template pattern string #:equal? bool -> ir
 (define (compile-test lang-id check expect message #:equal? equal?)
+  (define bv (gensym 'check))
+
   (define-values (guard-succeeds guard-fails)
     (if equal?
-        (values (pass-test*) (fail-test* message))
-        (values (fail-test* message) (pass-test*))))
-  (define bv (gensym 'check))
+        (values (pass-test*) (fail-test* message (lexical-var* bv)))
+
+        ;; In the not-equal? case, I don't think we need to print out
+        ;; the value that the check evaluated too when reporting a
+        ;; failure---it's the same as the expect.
+        (values (fail-test* message (none*)) (pass-test*))))
+
   (proc* '() (lett* bv
                     (compile/transcribe check (hash))
                     `(if ,(compile/guard expect lang-id (lexical-var* bv))

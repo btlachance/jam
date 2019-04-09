@@ -515,12 +515,15 @@ def error():
   bail("Error raised (did pattern matching fail")
 
 class ExnTestFailure(Exception):
-  def __init__(self, s):
+  def __init__(self, s, w):
     self.message = s
+    self.witness = w
   pass
 
-def fail_test(s):
-  raise ExnTestFailure(s)
+def fail_test(s, wit):
+  if wit.is_none():
+    wit = None
+  raise ExnTestFailure(s, wit)
 
 class ExnTestSuccess(Exception):
   pass

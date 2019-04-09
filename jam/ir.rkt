@@ -93,7 +93,7 @@
 (define-ir lexical-var (symbol))
 (define-ir module-var (modname symbol))
 (define-ir test (ir)) ;; ir must evaluate to a proc
-(define-ir fail-test (message))
+(define-ir fail-test (message witness))
 (define-ir pass-test ())
 (define-ir lett (var rhs body))
 (define-ir proc (formals body))
@@ -174,7 +174,7 @@
 ;; - (proc (listof symbol) ir)
 ;; - `(decompose-values ,ir ,ir)
 ;; - '(error)
-;; - (fail-test)
+;; - (fail-test string ir)
 ;; - (pass-test)
 ;; - (done ir)
 ;; - `(call ,var ,@(listof ir))

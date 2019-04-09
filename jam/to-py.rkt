@@ -24,7 +24,10 @@
       `(if (__name__ binop == "__test__")
            (try (app ,(ir->py-exp ir))
                 (,s-exn (pass))
-                (,f-exn as t (app print ("Test failed: %s" binop % (t dot message))))))]
+                (,f-exn as t
+                 (do (app print ("Test failed: %s" binop % (t dot message)))
+                     (if (t dot witness)
+                         (app print ("Got: %s" binop % (app (t dot witness to_toplevel_string)))))))))]
 
      [(evaluator* name transition
                   load maybe-unload control-string)
