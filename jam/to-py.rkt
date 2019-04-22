@@ -225,6 +225,12 @@
         'environment_extend 'environment_extend
         'environment_empty 'environment_empty
         ))
+;; A cheap way to test that this hash is partly consistent with
+;; core.py is to generate a python module that tries to import all of
+;; the values in py-core-names from the core module. The easiest way
+;; to load the core module, I think, would be to extend PYTHONPATH
+;; with the directory core.py is in. If that gets unwieldly then
+;; something in Python's site module might be helpful
 (define (core-name->py name) (hash-ref py-core-names name))
 
 (define (ir->py-exp ir)  

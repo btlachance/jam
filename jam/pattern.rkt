@@ -772,7 +772,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
            (match rep
              [(mf:plain ir) (list (define:* name ir))]
              [(mf:data py-name args)
-              (define internal (format-symbol "~a-internal" name))
+              (define internal (format-symbol "internal-~a" name))
 
               ;; XXX the way I produce code for defining a name bound
               ;; to a prim-procedure is causing problems: since it
@@ -786,7 +786,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                     (define:* name
                       (proc* '(t)
                              `(if ,(compile/guard args lang-id (lexical-var* 't))
-                                  (call ,(internal-ref internal py-name) ,(lexical-var* 't))
+                                  (call ,(lexical-var* internal) ,(lexical-var* 't))
                                   (error)))))]
              [(mf:call-evaluator e)
               (unless evaluator-handle
