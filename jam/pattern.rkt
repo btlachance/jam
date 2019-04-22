@@ -977,106 +977,6 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                          ,guard-succeeds
                          ,guard-fails))))
 
-;; module-renames : module -> (hash module-var symbol)
-
-;; (module-renames m) returns a mapping, renames, with keys for a
-;; subset of the module-var's provided by m. If renames has module-var
-;; mv as a key, then Python-level clients should refer to the value
-;; associated with key mv *instead of* the symbol part of mv; renames
-;; has no influence on the modname part of any module-var.
-(define (module-renames m)
-  (match m
-    [`(module ,modname
-          ,_
-        (provide ,@provides)
-        ,@toplevels)
-
-     (define (toplevel-renames t)
-       (match t
-         [(define:* name _)
-          #:when (not (set-member? provides name))
-          (hash)]
-         [(define:* name `(prim-class ,c)) (hash (module-var* modname name) c)]
-         [(define:* name `(prim-procedure ,p)) (hash (module-var* modname name) p)]
-         [_ (hash)]))
-
-     (foldr hash-union (hash) (map toplevel-renames toplevels))]))
-
-(define (annotate-with-py-names mods)
-  (define all-renames (apply hash-union (map module-renames mods)))
-
-  (define (annotate-var var)
-    (match var
-      [(module-var* modname symbol)
-       (match (hash-ref all-renames var #f)
-         [(? symbol? py-name) (annotate var 'py-name py-name)]
-         [_ var])]
-      [_ var]))
-
-  (define (annotate-body ir)
-    (match ir
-      [(lett* _ rhs body)
-       (struct-copy lett ir
-                    [rhs (annotate-ir rhs)]
-                    [body (annotate-body body)])]
-      [`(if ,ir ,then ,else)
-       `(if ,(annotate-ir ir)
-            ,(annotate-body then)
-            ,(annotate-body else))]
-
-      [(noop*) ir]
-
-      [ir (annotate-ir ir)]))
-
-  (define (annotate-ir ir)
-    (match ir
-      [(or (struct module-var _) (struct lexical-var _))
-       (annotate-var ir)]
-      [(or (? string? _) (? exact-integer? _) (? boolean? _)) ir]
-      [`(if ,ir0 ,ir1 ,ir2)
-       `(if ,(annotate-ir ir0) ,(annotate-ir ir1) ,(annotate-ir ir2))]
-      [`(not ,ir) `(not ,(annotate-ir ir))]
-      [`(and ,@irs) `(and ,@(map annotate-ir irs))]
-      [`(or ,@irs) `(or ,@(map annotate-ir irs))]
-      [(proc* _ body)
-       (struct-copy proc ir
-                    [body (annotate-body body)])]
-      [`(call ,var ,@irs) `(call ,(annotate-var var) ,@(map annotate-ir irs))]))
-
-  (define (annotate-toplevel t)
-    (match t
-      [(define:* name (or `(prim-class ,py-name)
-                          `(prim-procedure ,py-name)))
-       (annotate t 'py-name py-name)]
-
-      [(define:* name ir)
-       (struct-copy define: t
-                    [rhs (annotate-ir ir)])]
-      [(test* ir)
-       (struct-copy test t
-                    [ir (annotate-ir ir)])]
-
-      [(evaluator* _ transition load unload control-string)
-       (struct-copy evaluator t
-                    [transition (annotate-ir transition)]
-                    [load (annotate-ir load)]
-                    [unload (annotate-ir unload)]
-                    [control-string (annotate-ir control-string)])]
-
-      [ir (annotate-ir ir)]))
-
-  (define (annotate-mod m)
-    (match m
-      [`(module ,name
-          ,requires
-          ,provides
-          ,@toplevels)
-       `(module ,name
-          ,requires
-          ,provides
-          ,@(map annotate-toplevel toplevels))]))
-  (map annotate-mod mods))
-
 (define (link-prims-to-core mods)
   (define (link-toplevel t)
     (match t
@@ -1308,8 +1208,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                  ,@(map (mk/translate-toplevel name) toplevels)))]))
 
   (link-prims-to-core
-   (annotate-with-py-names
-    (map translate-module modules))))
+   (map translate-module modules)))
 
 (define (pattern-of-ps ps) (foldr pair '() ps))
 (define (repeat-pattern p) (repeat p))
