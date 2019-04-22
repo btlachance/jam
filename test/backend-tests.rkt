@@ -205,7 +205,7 @@
   (check-true (lang-metafunction-name? env-lang f)))
 
 (let-values ([(_ mod)
-              (lang-grammar-module env-lang #:runtime runtime-handle)])
+              (lang-grammar-module env-lang)])
   (check-match mod
                `(module ,_ ,_ ,_
                         ,@(list-no-order
@@ -215,7 +215,6 @@
 
 (let-values ([(_ mod)
               (lang-metafunction-module env-lang
-                                        #:runtime runtime-handle
                                         #:grammar (list (grammar-handle 'env0)))])
   (check-match mod
              `(module ,_ ,_ ,_
@@ -259,8 +258,7 @@
     '(env env ()))))
 (check-true (lang-evaluator-name? env-lang 'eval))
 
-(let-values ([(_ emod) (lang-evaluator-module env-lang
-                                              #:runtime runtime-handle)])
+(let-values ([(_ emod) (lang-evaluator-module env-lang)])
   (check-match emod
                `(module ,_ ,_ ,_
                         ,@(list-no-order

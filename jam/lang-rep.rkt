@@ -59,16 +59,14 @@
    (or/c nt:plain? nt:environment?)
    "a nonterminal rep"))
 
-(define (lang-grammar-module lang #:runtime runtime-handle)
+(define (lang-grammar-module lang)
   (grammar-module
    (lang-name lang)
    (map nonterminal-names (lang-info-nonterminals lang))
    (map nonterminal-rep (lang-info-nonterminals lang))
-   (lang-info-terminals lang)
-   #:runtime runtime-handle))
+   (lang-info-terminals lang)))
 
 (define (lang-metafunction-module lang
-                                  #:runtime runtime-handle
                                   #:grammar grammar-handles
                                   #:evaluator [evaluator-handle #f])
   (define mfs (lang-info-metafunctions lang))
@@ -76,25 +74,21 @@
    (lang-name lang)
    (map metafunction-name mfs)
    (map metafunction-code mfs)
-   #:runtime runtime-handle
    #:grammar grammar-handles
    #:evaluator evaluator-handle))
 
-(define (lang-test-module lang runtime-handle other-handles)
+(define (lang-test-module lang other-handles)
   (test-module
    (lang-name lang)
    (lang-info-tests lang)
-   runtime-handle
    other-handles))
 
 (define (lang-evaluator-module lang
-                               #:runtime runtime-handle
                                [other-handles '()])
   (evaluator-module
    (lang-name lang)
    (lang-info-evaluators lang)
    (lang-info-transitions lang)
-   runtime-handle
    other-handles))
 
 (define ((mk/parse-clause lang) arg rhs wheres)
@@ -378,15 +372,11 @@
                       #:when (equal? kind 'evaluator))
              name))))
 
-  (define-values (rmod-handle rmod) (runtime-module))
-
   (define-values (gmod-handle gmod) (lang-grammar-module
-                                     lang
-                                     #:runtime rmod-handle))
+                                     lang))
 
   (define-values (mmod-handle mmod) (lang-metafunction-module
                                      lang
-                                     #:runtime rmod-handle
                                      #:grammar (list gmod-handle)
                                      #:evaluator (and (not (null? (lang-info-evaluators lang)))
                                                       (evaluator-handle (lang-name lang)))))
@@ -394,7 +384,6 @@
   (define main
     (if main-evaluator
         (main-module main-evaluator
-                     #:runtime rmod-handle
                      #:evaluator (evaluator-handle (lang-name lang)))
         (default-main-module)))
 
@@ -405,7 +394,6 @@
          (let-values ([(_ tmod)
                        (lang-test-module
                         lang
-                        rmod-handle
                         (list gmod-handle mmod-handle))])
            (list tmod)))
      (if (null? (lang-info-evaluators lang))
@@ -413,13 +401,11 @@
          (let-values ([(_ emod)
                        (lang-evaluator-module
                         lang
-                        #:runtime rmod-handle
                         (list gmod-handle mmod-handle))])
            (list emod)))
-     (list rmod gmod mmod main)))
+     (list gmod mmod main)))
 
   (translate-modules mods
-                     #:runtime rmod-handle
                      #:grammar (list gmod-handle)
                      #:metafun (list mmod-handle)))
 

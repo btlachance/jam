@@ -38,7 +38,7 @@
       ;; XXX making a module-var+call out of thin air is a hack and
       ;; duplicates what's in pattern.rkt; this should be passed in on
       ;; an annotated ir or similar
-      (define none (ir->py-exp `(call ,(module-var* 'runtime 'make_none))))
+      (define none (ir->py-exp `(call ,(module-var* 'core 'none))))
 
       (define done-exception (ir->py-exp (get-annotation t 'jam-done-exn)))
       `(do (,driver-name assign (app ,driver-class
@@ -79,7 +79,7 @@
                            (t binop = t)
                            (tmp binop = tmp)))))
               (,done-exception as d (return (d dot v)))
-              (,(ir->py-exp (module-var* 'runtime 'JamError))
+              (,(ir->py-exp (module-var* 'core 'JamError))
                as e
                (do (app print ("Jam Error: %s" binop % (e dot s)))
                    (if t
@@ -185,12 +185,56 @@
   after replacements: ~a\n\
   tokens: ~a" name result ts)]))
 
+(define py-core-names
+  (hash 'nil 'make_nil
+        'none 'make_none
+        'pair 'make_pair
+        'symbol 'make_symbol
+        'integer 'make_integer
+        'boolean 'make_boolean
+        'hd 'get_hd
+        'tl 'get_tl
+        '= 'atoms_equal
+        'nil? 'is_nil
+        'pair? 'is_pair
+        'symbol? 'is_symbol
+        'integer? 'is_integer
+        'boolean? 'is_boolean
+        'list? 'is_list
+        'print-term 'print_term
+        'all? 'all_terms
+        'map 'map_terms
+        'decompose-values 'decompose_values
+        'error 'error
+        'fail-test 'fail_test
+        'pass-test 'pass_test
+        'done 'done
+        'from-json-string 'string_to_term
+        'JamDone 'JamDone
+        'JamError 'JamError
+        'ExnTestSuccess 'ExnTestSuccess
+        'ExnTestFailure 'ExnTestFailure
+        'list_reverse 'list_reverse
+        'integer_add0 'integer_add0
+        'integer_subtract0 'integer_subtract0
+        'integer_multiply0 'integer_multiply0
+        'is_environment 'is_environment
+        'environment_lookup 'environment_lookup
+        'environment_is_bound 'environment_is_bound
+        'environment_extend1 'environment_extend1
+        'environment_extend 'environment_extend
+        'environment_empty 'environment_empty
+        ))
+(define (core-name->py name) (hash-ref py-core-names name))
+
 (define (ir->py-exp ir)  
   (match ir
     [(lexical-var* t)
      (match (get-annotation ir 'py-name)
        [(? symbol? rename) (pythonify-name rename)]
        [_ (pythonify-name t)])]
+
+    [(module-var* (== core-handle) name) `(core dot ,(core-name->py name))]
 
     [(module-var* modname name)
      `(,(pythonify-name modname)

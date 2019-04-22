@@ -6,10 +6,10 @@
          fold-pattern-literals suffixed-underscore?
          compile/guard compile/deconstruct compile/transcribe compile-clauses
          compile-test
-         runtime-module grammar-module metafunction-module test-module
+         grammar-module metafunction-module test-module
          evaluator-module main-module default-main-module
          translate-modules lift-procs
-         runtime-handle grammar-handle evaluator-handle
+         grammar-handle evaluator-handle core-handle
          (struct-out name) (struct-out literal) clause mf-apply pair
          nonterminal pattern-of-ps repeat-pattern)
 
@@ -480,7 +480,6 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 
 ;; a module-handle is one of
 ;; - 'core
-;; - 'runtime
 ;; - (lang-module-handle symbol symbol)
 (struct lang-module-handle (lang-id mod-id) #:transparent)
 
@@ -494,9 +493,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 ;; will be cleaned up so things that don't need core don't import
 ;; it. Thus the distinction between core and runtime.
 (define core-handle 'core)
-(define runtime-handle 'runtime)
-(define (builtin-handle? v)
-  (or (eq? v runtime-handle) (eq? v core-handle)))
+(define (builtin-handle? v) (eq? v core-handle))
 
 (define (require-for-handle h)
   (match h
@@ -512,15 +509,11 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
     [(? builtin-handle? v) (module-var* h id)]
     [(lang-module-handle _ mod-id) (module-var* mod-id id)]))
 
-(define (annotate-test-exceptions v [runtime-handle #f])
-  (define-values (s f)
-    (if runtime-handle
-        (values (modvar-for-handle runtime-handle 'ExnTestSuccess)
-                (modvar-for-handle runtime-handle 'ExnTestFailure))
-        (values (internal-ref 'ExnTestSuccess 'ExnTestSuccess)
-                (internal-ref 'ExnTestFailure 'ExnTestFailure))))
-  (annotate (annotate v 'success-exn s)
-            'failure-exn f))
+(define (annotate-test-exceptions v)
+  (define (core s) (modvar-for-handle core-handle s))
+
+  (annotate (annotate v 'success-exn (core 'ExnTestSuccess))
+            'failure-exn (core 'ExnTestFailure)))
 
 ;; XXX uses of the runtime functions inside the runtime module is
 ;; currently very hacky. Any use of thiso function is likely
@@ -529,79 +522,12 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 (define (internal-ref name py-name)
   (annotate (lexical-var* name) 'py-name py-name))
 
-(define (runtime-module)
-  (values
-   runtime-handle
-   `(module ,runtime-handle
-      (require ,core-handle)
-      (provide nil none pair symbol integer boolean
-               hd tl = nil? pair? symbol? integer? boolean? list?
-               all? map decompose-values error
-               fail-test pass-test done
-               ExnTestSuccess ExnTestFailure JamDone JamError)
-
-      ,(define:* 'Term '(prim-class W_Term))
-      ,(define:* 'Nil '(prim-class W_Nil))
-      ,(define:* 'Pair '(prim-class W_Pair))
-      ,(define:* 'Symbol '(prim-class W_Symbol))
-      ,(define:* 'Integer '(prim-class W_Integer))
-      ,(define:* 'TermList '(prim-class W_TermList))
-      ,(define:* 'ExnTestSuccess '(prim-class ExnTestSuccess))
-      ,(define:* 'ExnTestFailure '(prim-class ExnTestFailure))
-      ,(define:* 'JamDone '(prim-class JamDone))
-      ,(define:* 'JamError '(prim-class JamError))
-
-      ,(define:* 'nil '(prim-procedure make_nil))
-      ,(define:* 'none '(prim-procedure make_none))
-      ,(define:* 'pair '(prim-procedure make_pair))
-      ,(define:* 'symbol '(prim-procedure make_symbol))
-      ,(define:* 'integer '(prim-procedure make_integer))
-      ,(define:* 'boolean '(prim-procedure make_boolean))
-
-      ,(define:* 'hd '(prim-procedure get_hd))
-      ,(define:* 'tl '(prim-procedure get_tl))
-      ,(define:* '= '(prim-procedure atoms_equal))
-      ,(define:* 'nil? '(prim-procedure is_nil))
-      ,(define:* 'pair? '(prim-procedure is_pair))
-      ,(define:* 'symbol? '(prim-procedure is_symbol))
-      ,(define:* 'integer? '(prim-procedure is_integer))
-      ,(define:* 'boolean? '(prim-procedure is_boolean))
-      ,(define:* 'list? '(prim-procedure is_list))
-      ,(define:* 'print-term '(prim-procedure print_term))
-
-      ,(define:* 'all? '(prim-procedure all_terms))
-      ,(define:* 'map '(prim-procedure map_terms))
-      ,(define:* 'decompose-values '(prim-procedure decompose_values))
-      ,(define:* 'error '(prim-procedure error))
-      ,(define:* 'fail-test '(prim-procedure fail_test))
-      ,(define:* 'pass-test '(prim-procedure pass_test))
-      ,(define:* 'from-json '(prim-procedure json_to_term))
-      ,(define:* 'from-json-string '(prim-procedure string_to_term))
-      ,(define:* 'done '(prim-procedure done))
-
-      ,@(for/list ([t '(() 5 x (x y) (let ([x 0] [y 1]) (+ x y)))])
-          (define test-message (format "smoke test ~a" t))
-          (define cond
-            `(call
-              ;; XXX I really shouldn't be setting py-name here,
-              ;; but I don't want to do lexical-var annotations in
-              ;; annotate-with-py-names until I can rename all of
-              ;; them to distinct names.
-              ,(internal-ref 'from-json-string 'string_to_term)
-              ,(jsexpr->string (term-to-json t))))
-          (define ir
-            (proc* '() `(if ,cond
-                            (call ,(internal-ref 'pass-test 'pass_test))
-                            (call ,(internal-ref 'fail-test 'fail_test) ,test-message ,(none*)))))
-          (annotate-test-exceptions (test* ir))))))
-
 (define (main-module ev-name
-                     #:runtime rt-handle
                      #:evaluator ev-handle)
 
   (define-values (result tmp) (values (gensym 'result) (gensym 'tmp)))
   `(module main
-     (require ,@(map require-for-handle (list rt-handle ev-handle)))
+     (require ,@(map require-for-handle (list core-handle ev-handle)))
      (provide main)
 
      ,(define:* 'main
@@ -620,10 +546,11 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 (define (pred-name nt-name) (format-symbol "nt-~a?" nt-name))
 
 ;; ir -> cgmir
-(define (translate-runtime runtime-handle ir)
-  (define (call-runtime id . args)
-    `(call ,(modvar-for-handle runtime-handle id) ,@args))
-  (define (translate ir) (translate-runtime runtime-handle ir))
+(define (translate-runtime ir)
+  (define (call-prim id . args)
+    `(call ,(modvar-for-handle core-handle id) ,@args))
+
+  (define translate translate-runtime)
 
   (define (translate-body ir)
     (match ir
@@ -641,40 +568,35 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
       [_ (translate ir)]))
 
   (match ir
-    [(module-var* x _)
-     #:when (equal? x (mod-id-for-handle runtime-handle))
-     (error 'translate-runtime
-            "internal: got a runtime module that referred to itself")]
-
     [(or (lexical-var* _) (module-var* _ _) (? string? _) (? exact-integer? _) (? boolean? _))
      ir]
 
-    ['(nil) (call-runtime 'nil)]
-    [(none*) (call-runtime 'none)]
-    [`(pair ,hd ,tl) (call-runtime 'pair (translate hd) (translate tl))]
-    [`(symbol ,s) (call-runtime 'symbol (symbol->string s))]
-    [`(integer ,n) (call-runtime 'integer n)]
-    [`(boolean ,b) (call-runtime 'boolean b)]
+    ['(nil) (call-prim 'nil)]
+    [(none*) (call-prim 'none)]
+    [`(pair ,hd ,tl) (call-prim 'pair (translate hd) (translate tl))]
+    [`(symbol ,s) (call-prim 'symbol (symbol->string s))]
+    [`(integer ,n) (call-prim 'integer n)]
+    [`(boolean ,b) (call-prim 'boolean b)]
 
-    [`(hd ,arg) (call-runtime 'hd (translate arg))]
-    [`(tl ,arg) (call-runtime 'tl (translate arg))]
+    [`(hd ,arg) (call-prim 'hd (translate arg))]
+    [`(tl ,arg) (call-prim 'tl (translate arg))]
 
     [`(= ,arg0 ,arg1)
-     (call-runtime '= (translate arg1) (translate arg0))]
+     (call-prim '= (translate arg1) (translate arg0))]
     [`(if ,e1 ,e2 ,e3) `(if ,(translate e1) ,(translate e2) ,(translate e3))]
     [`(not ,ir) `(not ,(translate ir))]
     [`(and ,@irs) `(and ,@(map translate irs))]
     [`(or ,@irs) `(or ,@(map translate irs))]
-    [`(nil? ,arg) (call-runtime 'nil? (translate arg))]
-    [`(pair? ,arg) (call-runtime 'pair? (translate arg))]
-    [`(symbol? ,arg) (call-runtime 'symbol? (translate arg))]
-    [`(integer? ,arg) (call-runtime 'integer? (translate arg))]
-    [`(boolean? ,arg) (call-runtime 'boolean? (translate arg))]
-    [`(list? ,arg) (call-runtime 'list? (translate arg))]
-    [(print-term* ir) (call-runtime 'print-term (translate ir))]
+    [`(nil? ,arg) (call-prim 'nil? (translate arg))]
+    [`(pair? ,arg) (call-prim 'pair? (translate arg))]
+    [`(symbol? ,arg) (call-prim 'symbol? (translate arg))]
+    [`(integer? ,arg) (call-prim 'integer? (translate arg))]
+    [`(boolean? ,arg) (call-prim 'boolean? (translate arg))]
+    [`(list? ,arg) (call-prim 'list? (translate arg))]
+    [(print-term* ir) (call-prim 'print-term (translate ir))]
 
     [`(all? ,ir ,arg)
-     (call-runtime 'all? (translate ir) (translate arg))]
+     (call-prim 'all? (translate ir) (translate arg))]
 
     [`(produced-by? ,lang ,nt ,ir) `(produced-by? ,lang ,nt ,(translate ir))]
 
@@ -691,7 +613,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
      (translate ir)]
 
     [`(map ,ir ,arg)
-     (call-runtime 'map (translate ir) (translate arg))]
+     (call-prim 'map (translate ir) (translate arg))]
 
     [`(mf-apply ,lang ,name ,ir)
      `(mf-apply ,lang ,name ,(translate ir))]
@@ -701,20 +623,19 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                   [body (translate-body body)])]
 
     [`(decompose-values ,levels ,values)
-     (call-runtime 'decompose-values (translate levels) (translate values))]
+     (call-prim 'decompose-values (translate levels) (translate values))]
 
-    ['(error) (call-runtime 'error)]
+    ['(error) (call-prim 'error)]
 
-    [(fail-test* s wit) (call-runtime 'fail-test s (translate wit))]
-    [(pass-test*) (call-runtime 'pass-test)]
+    [(fail-test* s wit) (call-prim 'fail-test s (translate wit))]
+    [(pass-test*) (call-prim 'pass-test)]
 
-    [(done* ir) (call-runtime 'done ir)]
+    [(done* ir) (call-prim 'done ir)]
 
     [`(call ,var ,@args)
      `(call ,var ,@(map translate args))]))
 
-(define (grammar-module lang-id namess reps terminals
-                        #:runtime runtime-handle)
+(define (grammar-module lang-id namess reps terminals)
 
   (define handle (grammar-handle lang-id))
   (define (compile/g p) (compile/guard p lang-id (lexical-var* 't)))
@@ -750,7 +671,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
   (values
    handle
    `(module ,(mod-id-for-handle handle)
-      (require ,@(map require-for-handle (list core-handle runtime-handle)))
+      (require ,@(map require-for-handle (list core-handle)))
       (provide ,@(hash-keys grammar-functions))
       ,@(for/list ([(name proc) (in-hash grammar-functions)])
           (define:* name proc)))))
@@ -831,7 +752,6 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
      `(call ,var ,@(map translate irs))]))
 
 (define (metafunction-module lang-id mf-names mf-reps
-                             #:runtime runtime-handle
                              #:grammar grammar-handles
                              #:evaluator [evaluator-handle #f])
   (define mod-id (format-symbol "~a-metafun" lang-id))
@@ -839,7 +759,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
    (lang-module-handle lang-id mod-id)
    `(module ,mod-id
         (require ,@(map require-for-handle
-                        (append (list core-handle runtime-handle)
+                        (append (list core-handle)
                                 (if evaluator-handle
                                     (list evaluator-handle)
                                     '())
@@ -944,29 +864,42 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
     [`(call ,var ,@irs)
      `(call ,var ,@(map translate irs))]))
 
-(define (test-module lang-id tests runtime-handle other-handles)
+(define (test-module lang-id tests other-handles)
   (define mod-id (format-symbol "~a-test" lang-id))
   (values
    (lang-module-handle lang-id mod-id)
    `(module ,mod-id
       (require ,@(map require-for-handle
-                      (append (list core-handle runtime-handle) other-handles)))
+                      (append (list core-handle) other-handles)))
       (provide)
+
+      ,@(for/list ([t '(() 5 x (x y) (let ([x 0] [y 1]) (+ x y)))])
+          (define test-message (format "smoke test ~a" t))
+          (define cond
+            `(call
+              ,(modvar-for-handle core-handle 'from-json-string)
+              ,(jsexpr->string (term-to-json t))))
+          (define ir
+            (proc* '() `(if ,cond
+                            ,(pass-test*)
+                            ,(fail-test* test-message (none*)))))
+          (annotate-test-exceptions (test* ir)))
+
       ,@(for/list ([ir tests])
-          (annotate-test-exceptions (test* ir) runtime-handle)))))
+          (annotate-test-exceptions (test* ir))))))
 
 
 (define (evaluator-handle lang-id)
   (define mod-id (format-symbol "~a-evaluator" lang-id))
   (lang-module-handle lang-id mod-id))
 (define (evaluator-module lang-id evaluators transitions
-                          runtime-handle other-handles)
+                          other-handles)
 
   (define handle (evaluator-handle lang-id))
   (values
    handle
    `(module ,(mod-id-for-handle handle)
-      (require ,@(map require-for-handle (cons runtime-handle other-handles))
+      (require ,@(map require-for-handle (cons core-handle other-handles))
                ,(py-from* '(rpython rlib) '(jit)))
       (provide)
 
@@ -1006,7 +939,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
              (annotate
               evaluator
               'rpython-jit-prefix 'jit)
-             'jam-done-exn (modvar-for-handle runtime-handle 'JamDone))))))))
+             'jam-done-exn (modvar-for-handle core-handle 'JamDone))))))))
 
 (define (control-string-projection lang-name control-string? t ws)
   (compile-clause
@@ -1320,18 +1253,16 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                       (define:* (get-annotation proc 'lifted-name) proc))
                     deprocd))))]))
 
-;; translate-modules : #:runtime module-handle
-;;                     #:grammar (listof module-handle)
+;; translate-modules : #:grammar (listof module-handle)
 ;;                     #:metafun (listof module-handle)
 ;;                     (listof module) -> (listof module)
 
-;; (translate-modules #:runtime rh #:grammar ghs #:metafun mhs mods)
+;; (translate-modules #:grammar ghs #:metafun mhs mods)
 ;; translates all ir in mods to core-ir; translates prims into the
 ;; proper modvar reference. Annotates all module-var that refer to a
 ;; prim-class or prim-procedure with 'py-name and the corresponding
 ;; Python-level name.
-(define (translate-modules #:runtime runtime-handle
-                           #:grammar grammar-handles
+(define (translate-modules #:grammar grammar-handles
                            #:metafun metafun-handles
                            modules)
 
@@ -1340,7 +1271,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
      metafun-handles current-mod
      (translate-grammar
       grammar-handles current-mod
-      (translate-runtime runtime-handle ir))))
+      (translate-runtime ir))))
 
   (define ((mk/translate-toplevel current-mod) t)
     (define (translate ir-or-prim)
