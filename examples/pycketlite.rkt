@@ -5,6 +5,10 @@
 (define-language pl
   #:data ([env (environment x V)])
 
+
+  (P     ::= (t ...))
+  (t     ::= e (define-values (x) e)) ;; general-top-level-form but
+                                      ;; only with single-val define
   (e     ::= x (lambda (x ...) e) integer boolean (e e ...)
              (if e e e))
   (x y z ::= variable-not-otherwise-mentioned)
@@ -12,15 +16,32 @@
              prim+ prim- prim* primzero?)
 
   (V ::= {env v})
-  (k ::= mt (appk env (e ...) (V ...) k) (ifk env e e k)))
+  (k ::= (appk env (e ...) (V ...) k) (ifk env e e k)
+         (defk (x) env P) (topk env P)))
 
 (define-metafunction pl
-  [(init-env)
-   (env-extend
-    env
-    (+ - * zero?)
-    ({env prim+} {env prim-} {env prim*} {env primzero?}))
-   (where env (env-empty))])
+  [(init-env (x_toplevel ...))
+   env
+
+   (where env (env-empty))
+   (where env (env-extend
+               (env-empty)
+               (+ - * zero?)
+               ({env prim+} {env prim-} {env prim*} {env primzero?})))
+   (where env (env-extend-cells env (x_toplevel ...)))])
+
+(define-metafunction pl
+  [(toplevel-names ())
+   ()]
+
+  [(toplevel-names (e t ...))
+   (toplevel-names (t ...))]
+
+  [(toplevel-names ((define-values (x) _) t ...))
+   ;; Current template language doesn't allow (x ... x_rest ...)
+   ;; which looks a lot like appending two lists
+   (x x_rest ...)
+   (where (x_rest ...) (toplevel-names (t ...)))])
 
 (define-metafunction pl
   [(apply-op (lambda (x ...) e) env (V ...))
@@ -43,6 +64,22 @@
 
 (define-transition pl
   step
+  [--> (topk env (t t_rest ...))
+       (t (topk env (t_rest ...)))]
+
+  [--> (e (topk env P))
+       (e env (topk env P))]
+
+  [--> (v env (topk env_top P))
+       (topk env_top P)]
+
+  [--> ((define-values (x) e) (topk env P))
+       (e env (defk (x) env P))]
+
+  [--> (v env (defk (x) env_top P))
+       (topk env_top P)
+       (where () (env-set-cells env_top (x) ({env v})))]
+
   [--> (x env k)
        (v env_v k)
        (where {env_v v} (env-lookup env x))]
@@ -73,21 +110,39 @@
 
 (define-evaluator pl
   eval
-  #:load [--> e (e (init-env) mt)]
-  #:unload [--> (v _ mt) v]
+
+  #:load [--> P (topk (init-env (toplevel-names P)) P)]
+
+  #:unload [--> (topk _ ()) #t] ;; XXX maybe call an exit metafunction
+                                ;; here, indicating a succesful
+                                ;; termination?
+  #:transition step
+  #:control-string [(e _ _) e])
+
+;; For now, eval-e is only really useful for internal testing. I don't
+;; know/have a good way to set things up to use it with the --repl
+;; flag while ensuring that it's built; right now the --build flag
+;; only controls building a single evaluator, and I don't know how to
+;; generalize that to work with the expression evaluator and the
+;; --repl flag. Adding an argument to --build sounds annoying...
+(define-evaluator pl
+  eval-e
+
+  #:load [--> e (topk (init-env ()) (e))]
+  #:unload [--> (v _ (topk _ ())) v]
   #:transition step
   #:control-string [(e _ _) e])
 
 (module+ test
   (current-test-language pl)
-  (test-equal (run-eval (+ 1 2)) 3)
-  (test-equal (run-eval ((lambda (x) x) 10)) 10)
-  (test-equal (run-eval (((lambda (x) (lambda (y) x)) 5) 6))
+  (test-equal (run-eval-e (+ 1 2)) 3)
+  (test-equal (run-eval-e ((lambda (x) x) 10)) 10)
+  (test-equal (run-eval-e (((lambda (x) (lambda (y) x)) 5) 6))
               5)
-  (test-equal (run-eval ((lambda (f x) (f x)) zero? 0)) #t)
-  (test-equal (run-eval ((lambda (f x) (f x)) (lambda (n) (+ n 1)) 0)) 1)
+  (test-equal (run-eval-e ((lambda (f x) (f x)) zero? 0)) #t)
+  (test-equal (run-eval-e ((lambda (f x) (f x)) (lambda (n) (+ n 1)) 0)) 1)
 
-  (test-equal (run-eval
+  (test-equal (run-eval-e
                ((lambda (fib) (fib fib 8))
                 (lambda (rec n)
                   (if (zero? n)
@@ -98,13 +153,29 @@
                              (rec rec (- n 2))))))))
               21)
 
-  (test-equal (run-eval
+  (test-equal (run-eval-e
                ((lambda (fact) (fact fact 10))
                 (lambda (rec n)
                   (if (zero? n)
                       1
                       (* n (rec rec (- n 1)))))))
               3628800)
+
+  (test-equal (run-eval
+               ((define-values (id) (lambda (x) x))
+                (+ (id 0) (id 1))
+                (+ 3 4)
+                (+ 5 6)))
+              #t)
+
+  (test-equal (run-eval
+               ((define-values (fact)
+                  (lambda (n)
+                    (if (zero? n)
+                        1
+                        (* n (fact (- n 1))))))
+                (fact 10)))
+              #t)
 
   (jam-test))
 
@@ -129,7 +200,7 @@
    ;; to cache the term->json process, though, then we need to either
    ;; change the evaluation handler or not go through the REPL (which
    ;; is hard-coded into jam-run) since it does its own term->json
-   ["--repl" "Start a REPL where each input is run run as a separate program"
+   ["--repl" "Start a REPL where each input is run as a separate program"
              (run 'repl)]
    ["--stdin" "Read a single program from stdin, and run it"
               (run 'stdin)]
