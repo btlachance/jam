@@ -570,7 +570,7 @@ class W_Environment(W_Term):
     return "#%env"
   def mark_static(self):
     pass
-  def lookup_cell(self, y):
+  def lookup_raw(self, y):
     bail("Variable %s not bound to a cell" % y.to_string())
 
   lookup = subclass_responsibility1
@@ -639,11 +639,14 @@ class W_MultipleEnvironment(W_Environment):
     return self.env.is_bound(y)
 
 class W_CellEnvironment(W_MultipleEnvironment):
-  @jit.unroll_safe
   def lookup(self, y):
-    return self.lookup_cell(y).cell_value()
+    v = self.lookup_raw(y)
+    if v.is_cell():
+      return v.cell_value()
+    else:
+      return v
 
-  def lookup_cell(self, y):
+  def lookup_raw(self, y):
     return W_MultipleEnvironment.lookup(self, y)
 
 def test_env():
@@ -743,7 +746,7 @@ def environment_set_cells(t):
   [env, xs, vs] = [x for x in W_TermList(t)]
 
   for x, v in izip2(W_TermList(xs), W_TermList(vs)):
-    cell = env.lookup_cell(x)
+    cell = env.lookup_raw(x)
     if not cell.is_cell():
       bail("internal: environment_set_cells got a non-cell for variable %s" %
            x.to_string())
