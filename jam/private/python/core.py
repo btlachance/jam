@@ -573,6 +573,9 @@ class W_Environment(W_Term):
   def lookup_cell(self, y):
     bail("Variable %s not bound to a cell" % y.to_string())
 
+  lookup = subclass_responsibility1
+  is_bound = subclass_responsibility1
+
 class W_EmptyEnvironment(W_Environment):
   def lookup(self, y):
     bail("Varaible %s not bound" % y.to_string())
