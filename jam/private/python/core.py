@@ -62,6 +62,10 @@ class W_Term(object):
     bail("internal: Not a symbol")
   def bool_value(self):
     bail("internal: Not a boolean")
+  def cell_value(self):
+    bail("internal: Not a cell")
+  def mutate_cell(self):
+    bail("internal: Not a cell")
   def hd(self):
     bail("internal: Not a pair")
   def tl(self):
@@ -235,6 +239,27 @@ class W_Boolean(W_Term):
   def to_string(self):
     return '#t' if self.bool_value() else '#f'
 
+class W_Cell(W_Term):
+  _immutable_fields_ = []
+  def __init__(self):
+    W_Term.__init__(self)
+    self.value = make_none()
+
+  def is_cell(self):
+    return True
+
+  def atoms_equal(self, other):
+    return False
+
+  def to_string(self):
+    return self.value.to_string()
+
+  def cell_value(self):
+    return self.value
+
+  def mutate_cell(self, v):
+    self.value = v
+
 class W_TermList(W_Term):
   _immutable_fields_ = ['t']
 
@@ -311,6 +336,9 @@ def make_integer(n):
 
 def make_boolean(b):
   return W_Boolean(b)
+
+def make_cell():
+  return W_Cell()
 
 @jit.unroll_safe
 def term_list(vs):
@@ -542,6 +570,8 @@ class W_Environment(W_Term):
     return "#%env"
   def mark_static(self):
     pass
+  def lookup_cell(self, y):
+    bail("Variable %s not bound to a cell" % y.to_string())
 
 class W_EmptyEnvironment(W_Environment):
   def lookup(self, y):
@@ -605,6 +635,14 @@ class W_MultipleEnvironment(W_Environment):
         return True
     return self.env.is_bound(y)
 
+class W_CellEnvironment(W_MultipleEnvironment):
+  @jit.unroll_safe
+  def lookup(self, y):
+    return self.lookup_cell(y).cell_value()
+
+  def lookup_cell(self, y):
+    return W_MultipleEnvironment.lookup(self, y)
+
 def test_env():
   empty = W_EmptyEnvironment()
   x, y = make_symbol('x'), make_symbol('y')
@@ -637,6 +675,22 @@ def test_envwrongnumber():
 
   with pytest.raises(JamError):
     environment_extend(term_list([empty, xs1, vs1]))
+
+def test_envcells():
+  empty = W_EmptyEnvironment()
+  x, y = make_symbol('x'), make_symbol('y')
+  xs = term_list([x, y])
+
+  env = environment_extend_cells(term_list([empty, xs]))
+  assert env.is_bound(x)
+  assert env.lookup(x).is_none()
+  assert env.is_bound(y)
+  assert env.lookup(y).is_none()
+  assert not env.is_bound(make_symbol('z'))
+
+  environment_set_cells(term_list([env, xs, term_list([env, env])]))
+  assert env.lookup(x) is env
+  assert env.lookup(y) is env
 
 @jit.unroll_safe
 def environment_lookup(t):
@@ -674,6 +728,26 @@ def test_env_metafunction():
   env0 = environment_extend(term_list([empty, xs0, vs0]))
   assert env0.lookup(y).int_value() == 3
   assert env0.lookup(x).int_value() == 4
+
+@jit.unroll_safe
+def environment_extend_cells(t):
+  [env, xs] = [x for x in W_TermList(t)]
+  vs = term_list([make_cell() for x in W_TermList(xs)])
+  return W_CellEnvironment(xs, vs, env)
+
+@jit.unroll_safe
+def environment_set_cells(t):
+  [env, xs, vs] = [x for x in W_TermList(t)]
+
+  for x, v in izip2(W_TermList(xs), W_TermList(vs)):
+    cell = env.lookup_cell(x)
+    if not cell.is_cell():
+      bail("internal: environment_set_cells got a non-cell for variable %s" %
+           x.to_string())
+
+    cell.mutate_cell(v)
+
+  return make_nil()
 
 class JamDone(Exception):
   def __init__(self, v):
