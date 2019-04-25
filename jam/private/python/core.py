@@ -16,12 +16,21 @@ def subclass_responsibility1(self, v):
 class W_Term(object):
   _immutable_fields_ = ['static']
 
-  is_nil = subclass_responsibility0
-  is_pair = subclass_responsibility0
-  is_symbol = subclass_responsibility0
-  is_integer = subclass_responsibility0
-  is_boolean = subclass_responsibility0
-  is_none = subclass_responsibility0
+  def is_nil(self):
+    return False
+  def is_pair(self):
+    return False
+  def is_symbol(self):
+    return False
+  def is_integer(self):
+    return False
+  def is_boolean(self):
+    return False
+  def is_none(self):
+    return False
+  def is_cell(self):
+    return False
+
   to_string = subclass_responsibility0
 
   def __init__(self):
@@ -67,21 +76,11 @@ class W_Term(object):
 
 def test_responsibility():
   with pytest.raises(JamError):
-    W_Term().is_nil()
+    W_Term().to_string()
 
 class W_Nil(W_Term):
   def is_nil(self):
     return True
-  def is_pair(self):
-    return False
-  def is_symbol(self):
-    return False
-  def is_integer(self):
-    return False
-  def is_boolean(self):
-    return False
-  def is_none(self):
-    return False
   def atoms_equal(self, other):
     return other.equals_nil(self)
   def equals_same(self, t):
@@ -90,16 +89,6 @@ class W_Nil(W_Term):
     return "()"
 
 class W_None(W_Term):
-  def is_nil(self):
-    return False
-  def is_pair(self):
-    return False
-  def is_symbol(self):
-    return False
-  def is_integer(self):
-    return False
-  def is_boolean(self):
-    return False
   def is_none(self):
     return True
   def to_string(self):
@@ -125,18 +114,8 @@ class W_Pair(W_Term):
     W_Term.__init__(self)
     self.head = hd
     self.tail = tl
-  def is_nil(self):
-    return False
   def is_pair(self):
     return True
-  def is_symbol(self):
-    return False
-  def is_integer(self):
-    return False
-  def is_boolean(self):
-    return False
-  def is_none(self):
-    return False
   def atoms_equal(self, other):
     return False
   def hd(self):
@@ -162,18 +141,8 @@ class W_Symbol(W_Term):
   def __init__(self, s):
     W_Term.__init__(self)
     self.s = s
-  def is_nil(self):
-    return False
-  def is_pair(self):
-    return False
   def is_symbol(self):
     return True
-  def is_integer(self):
-    return False
-  def is_boolean(self):
-    return False
-  def is_none(self):
-    return False
   def atoms_equal(self, other):
     return other.equals_symbol(self)
   def equals_same(self, other):
@@ -203,18 +172,8 @@ class W_Integer(W_Term):
   def __init__(self, n):
     W_Term.__init__(self)
     self.n = n
-  def is_nil(self):
-    return False
-  def is_pair(self):
-    return False
-  def is_symbol(self):
-    return False
   def is_integer(self):
     return True
-  def is_boolean(self):
-    return False
-  def is_none(self):
-    return False
   def atoms_equal(self, other):
     return other.equals_integer(self)
   def equals_same(self, n):
@@ -265,18 +224,8 @@ class W_Boolean(W_Term):
   def __init__(self, b):
     W_Term.__init__(self)
     self.b = b
-  def is_nil(self):
-    return False
-  def is_pair(self):
-    return False
-  def is_symbol(self):
-    return False
-  def is_integer(self):
-    return False
   def is_boolean(self):
     return True
-  def is_none(self):
-    return False
   def atoms_equal(self, other):
     return other.equals_boolean(self)
   def equals_same(self, b):
