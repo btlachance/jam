@@ -453,6 +453,17 @@
                  (mf-name 'extend)
                  (mf:data 'environment_extend (pattern-of-ps (list nt kps vps)))))
 
+              (let ([kps (repeat-pattern kp)])
+                (metafunction
+                 (mf-name 'extend-cells)
+                 (mf:data 'environment_extend_cells (pattern-of-ps (list nt kps)))))
+
+              (let ([kps (repeat-pattern kp)]
+                    [vps (repeat-pattern vp)])
+                (metafunction
+                 (mf-name 'set-cells)
+                 (mf:data 'environment_set_cells (pattern-of-ps (list nt kps vps)))))
+
               (metafunction
                (mf-name 'empty)
                (mf:data 'environment_empty (pattern-of-ps '()))))))]))

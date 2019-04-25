@@ -205,3 +205,23 @@
   (test-equal (swap #t) #f)
   (test-equal (swap #f) #t)
   (jam-test))
+
+(define-language env
+  #:data ([env (environment integer integer)]))
+
+;; Defining a metafunction is the closest thing we have to writing
+;; sequential code; Something like Redex's term-let seems useful for
+;; testing.
+(define-metafunction env
+  [(envtest)
+   ((env-lookup env 3)
+    (env-lookup env 2)
+    (env-lookup env 1))
+   (where env (env-extend-cells (env-empty) (1 2 3)))
+   (where () (env-set-cells env (1 2 3) (4 5 6)))
+   (where #f (env-bound? env 4))])
+
+(module+ test
+  (current-test-language env)
+  (test-equal (envtest) (6 5 4))
+  (jam-test))

@@ -223,6 +223,8 @@
         'environment_is_bound 'environment_is_bound
         'environment_extend1 'environment_extend1
         'environment_extend 'environment_extend
+        'environment_extend_cells 'environment_extend_cells
+        'environment_set_cells 'environment_set_cells
         'environment_empty 'environment_empty
         ))
 ;; A cheap way to test that this hash is partly consistent with
