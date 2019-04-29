@@ -64,7 +64,7 @@ class W_Term(object):
     bail("internal: Not a boolean")
   def cell_value(self):
     bail("internal: Not a cell")
-  def mutate_cell(self):
+  def mutate_cell(self, v):
     bail("internal: Not a cell")
   def hd(self):
     bail("internal: Not a pair")
