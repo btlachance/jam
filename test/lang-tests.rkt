@@ -220,8 +220,17 @@
    (where env (env-extend-cells (env-empty) (1 2 3)))
    (where () (env-set-cells env (1 2 3) (4 5 6)))
    (where #f (env-bound? env 4))])
+(define-metafunction env
+  [(extend1test)
+   ((env-lookup env 1)
+    (env-lookup env 10)
+    (env-lookup env 100))
+   (where env (env-extend1 (env-empty) 1 9))
+   (where env (env-extend1 env 10 90))
+   (where env (env-extend1 env 100 900))])
 
 (module+ test
   (current-test-language env)
   (test-equal (envtest) (6 5 4))
+  (test-equal (extend1test) (9 90 900))
   (jam-test))
