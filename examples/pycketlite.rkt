@@ -229,15 +229,17 @@
              (run 'repl)]
    ["--stdin" "Read a single program from stdin, and run it"
               (run 'stdin)]
+   ["--racket" path "Translate the Racket path to pycketlite and run it"
+               (run path)]
 
    #:once-each
    ["--build" "Build the interpreter"
               (build? #t)])
 
-  (when (and (not (build?)) (not (run)))
+  (unless (xor (build?) (run))
     (raise-user-error
      'pycketlite
-     "Must at least run or build an interpreter"))
+     "Must do exactly one of run or build"))
 
   (define translate? (equal? (interpreter-mode) 'translate))
 
@@ -252,8 +254,8 @@
        #:path dest
        #:translate? translate?)]
     ['stdin
-     (parameterize* ([read-accept-reader #f]
-                     [read-accept-lang #f])
+     (parameterize ([read-accept-reader #f]
+                    [read-accept-lang #f])
        (define input (read))
        (unless (eof-object? input)
          (parameterize ([current-input-port (open-input-string (~a input))])
@@ -261,4 +263,67 @@
              #:path dest
              #:translate? translate?
              #:prompt? #f))))]
+    [(? path-string? p)
+     (parameterize ([read-accept-reader #t]
+                    [read-accept-lang #t]
+                    [current-namespace (make-base-namespace)]
+                    [current-input-port (open-input-file p)])
+       (define stx (read-syntax))
+       (begin0 (unless (eof-object? stx)
+                 (define p (module->pycketlite (expand stx)))
+                 (parameterize ([current-input-port (open-input-string (~a p))])
+                   (jam-run pl eval
+                     #:path dest
+                     #:translate? translate?
+                     #:prompt? #f)))
+         (close-input-port (current-input-port))))]
     [#f (void)]))
+
+(require syntax/parse)
+(define (module->pycketlite stx)
+  (syntax-parse stx
+    #:literal-sets (kernel-literals)
+    [(module name lang
+       (#%module-begin mod-config
+                       forms ...))
+     (map form->pycketlite (attribute forms))]))
+
+(define (form->pycketlite f)
+  (syntax-parse f
+    #:literal-sets (kernel-literals)
+    #:datum-literals (call-with-values)
+    [(#%plain-app call-with-values (lambda () e) print-values)
+     (expr->pycketlite #'e)]
+
+    [(define-values (x) e)
+     `(define-values (,(syntax-e #'x)) ,(expr->pycketlite #'e))]))
+
+(define (expr->pycketlite e)
+  (syntax-parse e
+    #:literal-sets (kernel-literals)
+    [(#%plain-lambda (x ...) e)
+     `(lambda ,(map syntax-e (attribute x)) ,(expr->pycketlite #'e))]
+
+    [(if e1 e2 e3)
+     `(if ,(expr->pycketlite #'e1)
+          ,(expr->pycketlite #'e2)
+          ,(expr->pycketlite #'e3))]
+
+    [(quote n:exact-integer) (syntax-e #'n)]
+    [(quote b:boolean) (syntax-e #'b)]
+
+    [(#%plain-app e e* ...)
+     (cons (expr->pycketlite #'e) (map expr->pycketlite (attribute e*)))]
+
+    [x:id (syntax-e #'x)]))
+
+(module+ test
+  (require syntax/location rackunit)
+  (define racket (find-executable-path "racket"))
+
+  (match-define-values (base _ _) (split-path (quote-source-file)))
+  (define out (open-output-nowhere))
+  (for ([p (in-directory (build-path base "racket") (lambda _ #f))])
+    (check-true
+     (parameterize ([current-output-port out])
+       (system* racket (quote-source-file) "--racket" p)))))
