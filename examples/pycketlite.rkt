@@ -323,7 +323,8 @@
 
   (match-define-values (base _ _) (split-path (quote-source-file)))
   (define out (open-output-nowhere))
-  (for ([p (in-directory (build-path base "racket") (lambda _ #f))])
+  (for ([p (directory-list (build-path base "racket") #:build? #t)]
+        #:unless (equal? (path->string (file-name-from-path p)) "info.rkt"))
     (check-true
      (parameterize ([current-output-port out])
        (system* racket (quote-source-file) "--racket" p)))))
