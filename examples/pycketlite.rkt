@@ -5,7 +5,6 @@
 (define-language pl
   #:data ([env (environment x V)])
 
-
   (P     ::= (t ...))
   (t     ::= e (define-values (x) e)) ;; general-top-level-form but
                                       ;; only with single-val define
@@ -113,7 +112,7 @@
 
   #:load [--> P (topk (init-env (toplevel-names P)) P)]
 
-  #:unload [--> (topk _ ()) #t] ;; XXX maybe call an exit metafunction
+  #:unload [--> (topk _ ()) ()] ;; XXX maybe call an exit metafunction
                                 ;; here, indicating a succesful
                                 ;; termination?
   #:transition step
@@ -166,7 +165,7 @@
                 (+ (id 0) (id 1))
                 (+ 3 4)
                 (+ 5 6)))
-              #t)
+              ())
 
   (test-equal (run-eval
                ((define-values (fact)
@@ -175,7 +174,33 @@
                         1
                         (* n (fact (- n 1))))))
                 (fact 10)))
-              #t)
+              ())
+
+  (test-equal (run-eval
+               ((define-values (fib)
+                  (lambda (n)
+                    (if (zero? n)
+                        0
+                        (if (zero? (- n 1))
+                            1
+                            (+ (fib (- n 1))
+                               (fib (- n 2)))))))
+                (fib 8)))
+              ())
+
+  (test-equal (run-eval
+               ((define-values (even?)
+                  (lambda (n)
+                    (if (zero? n)
+                        #t
+                        (odd? (- n 1)))))
+                (define-values (odd?)
+                  (lambda (n)
+                    (if (zero? n)
+                        #f
+                        (even? (- n 1)))))
+                (even? 100)))
+              ())
 
   (jam-test))
 
