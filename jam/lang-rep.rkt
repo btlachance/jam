@@ -425,7 +425,11 @@
     (mf:data 'integer_subtract0 (pattern-of-ps (list 'integer 'integer))))
    (metafunction
     'integer-multiply
-    (mf:data 'integer_multiply0 (pattern-of-ps (list 'integer 'integer))))))
+    (mf:data 'integer_multiply0 (pattern-of-ps (list 'integer 'integer))))
+   (metafunction
+    'clock-milliseconds
+    (mf:data 'clock_milliseconds (pattern-of-ps '())))
+   ))
 
 (define (nonterminal-metafunctions nt-names nts rep)
   (match rep

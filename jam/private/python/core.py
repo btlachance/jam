@@ -1,3 +1,4 @@
+import time
 import pytest
 from rpython.rlib import jit
 from rpython.rlib.objectmodel import we_are_translated, specialize
@@ -772,6 +773,10 @@ def list_reverse(t):
   args = [x for x in W_TermList(args)]
   args.reverse()
   return term_list(args)
+
+def clock_milliseconds(t):
+  [] = [x for x in W_TermList(t)]
+  return make_integer(int(time.clock() * 1000))
 
 if __name__ == "__test__":
   pytest.main([__file__, "-q"])

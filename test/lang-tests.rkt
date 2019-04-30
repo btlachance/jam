@@ -233,4 +233,7 @@
   (current-test-language env)
   (test-equal (envtest) (6 5 4))
   (test-equal (extend1test) (9 90 900))
+
+  (test-not-equal (clock-milliseconds) 0)
+  (test-equal (integer-multiply (clock-milliseconds) 0) 0)
   (jam-test))

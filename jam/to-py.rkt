@@ -226,6 +226,7 @@
         'environment_extend_cells 'environment_extend_cells
         'environment_set_cells 'environment_set_cells
         'environment_empty 'environment_empty
+        'clock_milliseconds 'clock_milliseconds
         ))
 ;; A cheap way to test that this hash is partly consistent with
 ;; core.py is to generate a python module that tries to import all of
