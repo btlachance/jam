@@ -43,23 +43,20 @@
    (where (x_rest ...) (toplevel-names (t ...)))])
 
 (define-metafunction pl
-  [(apply-op {env (lambda (x ...) e)} (V ...))
-   (ret (env-extend env (x ...) (V ...)) e)]
-
   [(apply-op {_ prim+} ({_ integer_1} {_ integer_2}))
-   (ret (integer-add integer_1 integer_2))]
+   (integer-add integer_1 integer_2)]
 
   [(apply-op {_ prim-} ({_ integer_1} {_ integer_2}))
-   (ret (integer-subtract integer_1 integer_2))]
+   (integer-subtract integer_1 integer_2)]
 
   [(apply-op {_ prim*} ({_ integer_1} {_ integer_2}))
-   (ret (integer-multiply integer_1 integer_2))]
+   (integer-multiply integer_1 integer_2)]
 
   [(apply-op {_ primzero?} ({_ 0}))
-   (ret #t)]
+   #t]
 
   [(apply-op {_ primzero?} ({_ v}))
-   (ret #f)])
+   #f])
 
 (define-transition pl
   step
@@ -98,18 +95,19 @@
 
   [--> (V_0 (appk _ () (V ...) k))
        (e env_e k)
+       (where ({env_op (lambda (x ...) e)} V ...) (reverse (V_0 V ...)))
+       (where env_e (env-extend env_op (x ...) (V ...)))]
+
+  [--> (V_0 (appk _ () (V ...) k))
+       ({(env-empty) v_result} k)
        (where (V_op V ...) (reverse (V_0 V ...)))
-       (where (env_e e) (apply-op V_op (V ...)))]
+       (where v_result (apply-op V_op (V ...)))]
 
   [--> ({_ #f} (ifk env _ e_else k))
        (e_else env k)]
 
   [--> ({_ v} (ifk env e_then _ k))
        (e_then env k)])
-
-(define-metafunction pl
-  [(ret v) ((env-empty) v)]
-  [(ret env e) (env e)])
 
 (define-evaluator pl
   eval
