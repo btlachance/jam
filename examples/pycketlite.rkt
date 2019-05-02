@@ -43,22 +43,22 @@
    (where (x_rest ...) (toplevel-names (t ...)))])
 
 (define-metafunction pl
-  [(apply-op (lambda (x ...) e) env (V ...))
+  [(apply-op {env (lambda (x ...) e)} (V ...))
    (ret (env-extend env (x ...) (V ...)) e)]
 
-  [(apply-op prim+ _ ({_ integer_1} {_ integer_2}))
+  [(apply-op {_ prim+} ({_ integer_1} {_ integer_2}))
    (ret (integer-add integer_1 integer_2))]
 
-  [(apply-op prim- _ ({_ integer_1} {_ integer_2}))
+  [(apply-op {_ prim-} ({_ integer_1} {_ integer_2}))
    (ret (integer-subtract integer_1 integer_2))]
 
-  [(apply-op prim* _ ({_ integer_1} {_ integer_2}))
+  [(apply-op {_ prim*} ({_ integer_1} {_ integer_2}))
    (ret (integer-multiply integer_1 integer_2))]
 
-  [(apply-op primzero? _ ({_ 0}))
+  [(apply-op {_ primzero?} ({_ 0}))
    (ret #t)]
 
-  [(apply-op primzero? _ ({_ v}))
+  [(apply-op {_ primzero?} ({_ v}))
    (ret #f)])
 
 (define-transition pl
@@ -69,19 +69,15 @@
   [--> (e (topk env P))
        (e env (topk env P))]
 
-  [--> (v env (topk env_top P))
-       (topk env_top P)]
-
   [--> ((define-values (x) e) (topk env P))
        (e env (defk (x) env P))]
 
-  [--> (v env (defk (x) env_top P))
-       (topk env_top P)
-       (where () (env-set-cells env_top (x) ({env v})))]
-
   [--> (x env k)
-       (v env_v k)
-       (where {env_v v} (env-lookup env x))]
+       (V k)
+       (where V (env-lookup env x))]
+
+  [--> (v env k)
+       ({env v} k)]
 
   [--> ((e e_args ...) env k)
        (e env (appk env (e_args ...) () k))]
@@ -89,18 +85,26 @@
   [--> ((if e_test e_then e_else) env k)
        (e_test env (ifk env e_then e_else k))]
 
-  [--> (v env_v (appk env (e_arg e_args ...) (V ...) k))
-       (e_arg env (appk env (e_args ...) ({env_v v} V ...) k))]
 
-  [--> (v env_v (appk _ () (V ...) k))
+  [--> (V (topk env_top P))
+       (topk env_top P)]
+
+  [--> (V (defk (x) env_top P))
+       (topk env_top P)
+       (where () (env-set-cells env_top (x) (V)))]
+
+  [--> (V_0 (appk env (e_arg e_args ...) (V ...) k))
+       (e_arg env (appk env (e_args ...) (V_0 V ...) k))]
+
+  [--> (V_0 (appk _ () (V ...) k))
        (e env_e k)
-       (where ({env_op v_op} V ...) (reverse ({env_v v} V ...)))
-       (where (env_e e) (apply-op v_op env_op (V ...)))]
+       (where (V_op V ...) (reverse (V_0 V ...)))
+       (where (env_e e) (apply-op V_op (V ...)))]
 
-  [--> (#f _ (ifk env _ e_else k))
+  [--> ({_ #f} (ifk env _ e_else k))
        (e_else env k)]
 
-  [--> (v _ (ifk env e_then _ k))
+  [--> ({_ v} (ifk env e_then _ k))
        (e_then env k)])
 
 (define-metafunction pl
@@ -128,14 +132,20 @@
   eval-e
 
   #:load [--> e (topk (init-env ()) (e))]
-  #:unload [--> (v _ (topk _ ())) v]
+  #:unload [--> ({env v} (topk _ ())) v]
   #:transition step
   #:control-string [(e _ _) e])
 
 (module+ test
   (current-test-language pl)
+  (test-equal (run-eval-e 5) 5)
+  (test-equal (run-eval-e #f) #f)
   (test-equal (run-eval-e (+ 1 2)) 3)
+  (test-equal (run-eval-e (- 2 1)) 1)
   (test-equal (run-eval-e ((lambda (x) x) 10)) 10)
+  (test-equal (run-eval-e ((lambda (x y) x) 10 11)) 10)
+  (test-equal (run-eval-e ((lambda (x y) y) 10 11)) 11)
+  (test-equal (run-eval-e ((lambda (n) (+ 1 n)) 10)) 11)
   (test-equal (run-eval-e (((lambda (x) (lambda (y) x)) 5) 6))
               5)
   (test-equal (run-eval-e ((lambda (f x) (f x)) zero? 0)) #t)
