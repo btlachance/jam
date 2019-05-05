@@ -8,13 +8,12 @@
   (P     ::= (t ...))
   (t     ::= e (define-values (x) e)) ;; general-top-level-form but
                                       ;; only with single-val define
-  (e     ::= x (lambda (x ...) e) integer boolean (e e ...)
+  (e     ::= x (lambda (x ...) e) (quote c) (e e ...)
              (if e e e))
   (x y z ::= variable-not-otherwise-mentioned)
-  (v     ::= (lambda (x ...) e) integer boolean
-             prim+ prim- prim* primzero?)
+  (c     ::= integer boolean)
 
-  (V ::= {env v})
+  (V ::= {env (lambda (x ...) e)} c prim+ prim- prim* primzero?)
   (k ::= (appk env (e ...) (V ...) k) (ifk env e e k)
          (defk (x) env P) (topk env P)))
 
@@ -24,9 +23,9 @@
 
    (where env (env-empty))
    (where env (env-extend
-               (env-empty)
+               env
                (+ - * zero?)
-               ({env prim+} {env prim-} {env prim*} {env primzero?})))
+               (prim+ prim- prim* primzero?)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -43,19 +42,19 @@
    (where (x_rest ...) (toplevel-names (t ...)))])
 
 (define-metafunction pl
-  [(apply-op {_ prim+} ({_ integer_1} {_ integer_2}))
+  [(apply-op prim+ (integer_1 integer_2))
    (integer-add integer_1 integer_2)]
 
-  [(apply-op {_ prim-} ({_ integer_1} {_ integer_2}))
+  [(apply-op prim- (integer_1 integer_2))
    (integer-subtract integer_1 integer_2)]
 
-  [(apply-op {_ prim*} ({_ integer_1} {_ integer_2}))
+  [(apply-op prim* (integer_1 integer_2))
    (integer-multiply integer_1 integer_2)]
 
-  [(apply-op {_ primzero?} ({_ 0}))
+  [(apply-op primzero? (0))
    #t]
 
-  [(apply-op {_ primzero?} ({_ v}))
+  [(apply-op primzero? (V))
    #f])
 
 (define-transition pl
@@ -73,8 +72,11 @@
        (V k)
        (where V (env-lookup env x))]
 
-  [--> (v env k)
-       ({env v} k)]
+  [--> ((lambda (x ...) e) env k)
+       ({env (lambda (x ...) e)} k)]
+
+  [--> ((quote c) env k)
+       (c k)]
 
   [--> ((e e_args ...) env k)
        (e env (appk env (e_args ...) () k))]
@@ -99,14 +101,14 @@
        (where env_e (env-extend env_op (x ...) (V ...)))]
 
   [--> (V_0 (appk _ () (V ...) k))
-       ({(env-empty) v_result} k)
+       (V_result k)
        (where (V_op V ...) (reverse (V_0 V ...)))
-       (where v_result (apply-op V_op (V ...)))]
+       (where V_result (apply-op V_op (V ...)))]
 
-  [--> ({_ #f} (ifk env _ e_else k))
+  [--> (#f (ifk env _ e_else k))
        (e_else env k)]
 
-  [--> ({_ v} (ifk env e_then _ k))
+  [--> (V (ifk env e_then _ k))
        (e_then env k)])
 
 (define-evaluator pl
@@ -120,6 +122,10 @@
   #:transition step
   #:control-string [(e _ _) e])
 
+(define-metafunction pl
+  [(unload {env (lambda (x ...) e)}) v]
+  [(unload c) c])
+
 ;; For now, eval-e is only really useful for internal testing. I don't
 ;; know/have a good way to set things up to use it with the --repl
 ;; flag while ensuring that it's built; right now the --build flag
@@ -130,84 +136,84 @@
   eval-e
 
   #:load [--> e (topk (init-env ()) (e))]
-  #:unload [--> ({env v} (topk _ ())) v]
+  #:unload [--> (V (topk _ ())) (unload V)]
   #:transition step
   #:control-string [(e _ _) e])
 
 (module+ test
   (current-test-language pl)
-  (test-equal (run-eval-e 5) 5)
-  (test-equal (run-eval-e #f) #f)
-  (test-equal (run-eval-e (+ 1 2)) 3)
-  (test-equal (run-eval-e (- 2 1)) 1)
-  (test-equal (run-eval-e ((lambda (x) x) 10)) 10)
-  (test-equal (run-eval-e ((lambda (x y) x) 10 11)) 10)
-  (test-equal (run-eval-e ((lambda (x y) y) 10 11)) 11)
-  (test-equal (run-eval-e ((lambda (n) (+ 1 n)) 10)) 11)
-  (test-equal (run-eval-e (((lambda (x) (lambda (y) x)) 5) 6))
+  (test-equal (run-eval-e '5) 5)
+  (test-equal (run-eval-e '#f) #f)
+  (test-equal (run-eval-e (+ '1 '2)) 3)
+  (test-equal (run-eval-e (- '2 '1)) 1)
+  (test-equal (run-eval-e ((lambda (x) x) '10)) 10)
+  (test-equal (run-eval-e ((lambda (x y) x) '10 '11)) 10)
+  (test-equal (run-eval-e ((lambda (x y) y) '10 '11)) 11)
+  (test-equal (run-eval-e ((lambda (n) (+ '1 n)) '10)) 11)
+  (test-equal (run-eval-e (((lambda (x) (lambda (y) x)) '5) '6))
               5)
-  (test-equal (run-eval-e ((lambda (f x) (f x)) zero? 0)) #t)
-  (test-equal (run-eval-e ((lambda (f x) (f x)) (lambda (n) (+ n 1)) 0)) 1)
+  (test-equal (run-eval-e ((lambda (f x) (f x)) zero? '0)) #t)
+  (test-equal (run-eval-e ((lambda (f x) (f x)) (lambda (n) (+ n '1)) '0)) 1)
 
   (test-equal (run-eval-e
-               ((lambda (fib) (fib fib 8))
+               ((lambda (fib) (fib fib '8))
                 (lambda (rec n)
                   (if (zero? n)
-                      0
-                      (if (zero? (- n 1))
-                          1
-                          (+ (rec rec (- n 1))
-                             (rec rec (- n 2))))))))
+                      '0
+                      (if (zero? (- n '1))
+                          '1
+                          (+ (rec rec (- n '1))
+                             (rec rec (- n '2))))))))
               21)
 
   (test-equal (run-eval-e
-               ((lambda (fact) (fact fact 10))
+               ((lambda (fact) (fact fact '10))
                 (lambda (rec n)
                   (if (zero? n)
-                      1
-                      (* n (rec rec (- n 1)))))))
+                      '1
+                      (* n (rec rec (- n '1)))))))
               3628800)
 
   (test-equal (run-eval
                ((define-values (id) (lambda (x) x))
-                (+ (id 0) (id 1))
-                (+ 3 4)
-                (+ 5 6)))
+                (+ (id '0) (id '1))
+                (+ '3 '4)
+                (+ '5 '6)))
               ())
 
   (test-equal (run-eval
                ((define-values (fact)
                   (lambda (n)
                     (if (zero? n)
-                        1
-                        (* n (fact (- n 1))))))
-                (fact 10)))
+                        '1
+                        (* n (fact (- n '1))))))
+                (fact '10)))
               ())
 
   (test-equal (run-eval
                ((define-values (fib)
                   (lambda (n)
                     (if (zero? n)
-                        0
-                        (if (zero? (- n 1))
-                            1
-                            (+ (fib (- n 1))
-                               (fib (- n 2)))))))
-                (fib 8)))
+                        '0
+                        (if (zero? (- n '1))
+                            '1
+                            (+ (fib (- n '1))
+                               (fib (- n '2)))))))
+                (fib '8)))
               ())
 
   (test-equal (run-eval
                ((define-values (even?)
                   (lambda (n)
                     (if (zero? n)
-                        #t
-                        (odd? (- n 1)))))
+                        '#t
+                        (odd? (- n '1)))))
                 (define-values (odd?)
                   (lambda (n)
                     (if (zero? n)
-                        #f
-                        (even? (- n 1)))))
-                (even? 100)))
+                        '#f
+                        (even? (- n '1)))))
+                (even? '100)))
               ())
 
   (jam-test))
@@ -317,8 +323,7 @@
           ,(expr->pycketlite #'e2)
           ,(expr->pycketlite #'e3))]
 
-    [(quote n:exact-integer) (syntax-e #'n)]
-    [(quote b:boolean) (syntax-e #'b)]
+    [(quote {~or :exact-integer :boolean}) (syntax->datum this-syntax)]
 
     [(#%plain-app e e* ...)
      (cons (expr->pycketlite #'e) (map expr->pycketlite (attribute e*)))]
