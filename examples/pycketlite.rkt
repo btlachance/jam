@@ -8,12 +8,14 @@
   (P     ::= (t ...))
   (t     ::= e (define-values (x) e)) ;; general-top-level-form but
                                       ;; only with single-val define
-  (e     ::= x (lambda (x ...) e) (quote c) (e e ...)
+  (e     ::= x l (quote c) (e e ...)
              (if e e e))
+  (l     ::= (lambda (x ...) e) (lambda x e) (lambda (x ...) (dot x) e))
+
   (x y z ::= variable-not-otherwise-mentioned)
   (c     ::= integer boolean)
 
-  (V ::= {env (lambda (x ...) e)} c
+  (V ::= {env l} c
          #%+ #%- #%* #%zero?
          (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list)
   (k ::= (appk env (e ...) (V ...) k) (ifk env e e k)
@@ -86,8 +88,14 @@
    #%null]
 
   [(apply-op #%list (V V_rest ...))
-   ;; Unsafe because of RPython's bounded call-stack
    (#%cons V (apply-op #%list (V_rest ...)))])
+
+(define-metafunction pl
+  [(prefix-and-rest () (V_rest ...))
+   (() (apply-op #%list (V_rest ...)))]
+  [(prefix-and-rest (x y ...) (V_0 V ...))
+   ((V_0 V_prefix ...) V_rest)
+   (where ((V_prefix ...) V_rest) (prefix-and-rest (y ...) (V ...)))])
 
 (define-transition pl
   step
@@ -104,8 +112,8 @@
        (V k)
        (where V (env-lookup env x))]
 
-  [--> ((lambda (x ...) e) env k)
-       ({env (lambda (x ...) e)} k)]
+  [--> (l env k)
+       ({env l} k)]
 
   [--> ((quote c) env k)
        (c k)]
@@ -133,6 +141,20 @@
        (where env_e (env-extend env_op (x ...) (V ...)))]
 
   [--> (V_0 (appk _ () (V ...) k))
+       (e env_e k)
+       (where ({env_op (lambda x e)} V ...) (reverse (V_0 V ...)))
+       (where env_e (env-extend env_op (x) ((apply-op #%list (V ...)))))]
+
+  [--> (V_0 (appk _ () (V ...) k))
+       (e env_e k)
+       (where ({env_op (lambda (x ...) (dot y) e)} V ...) (reverse (V_0 V ...)))
+       (where ((V_prefix ...) V_rest) (prefix-and-rest (x ...) (V ...)))
+       ;; With append-like templates, this would instead be
+       ;; (env-extend env_op (x ... y) (V_prefix ... V_rest))
+       (where env_e (env-extend env_op (x ...) (V_prefix ...)))
+       (where env_e (env-extend env_e (y) (V_rest)))]
+
+  [--> (V_0 (appk _ () (V ...) k))
        (V_result k)
        (where (V_op V ...) (reverse (V_0 V ...)))
        (where V_result (apply-op V_op (V ...)))]
@@ -155,7 +177,7 @@
   #:control-string [(e _ _) e])
 
 (define-metafunction pl
-  [(unload {env (lambda (x ...) e)}) (lambda (x ...) e)]
+  [(unload {env l}) l]
   [(unload V) V])
 
 ;; For now, eval-e is only really useful for internal testing. I don't
@@ -179,6 +201,7 @@
   (test-equal (run-eval-e (+ '1 '2)) 3)
   (test-equal (run-eval-e (- '2 '1)) 1)
   (test-equal (run-eval-e (lambda (x) (x x))) (lambda (x) (x x)))
+  (test-equal (run-eval-e (lambda y y)) (lambda y y))
   (test-equal (run-eval-e ((lambda (x) x) '10)) 10)
   (test-equal (run-eval-e ((lambda (x y) x) '10 '11)) 10)
   (test-equal (run-eval-e ((lambda (x y) y) '10 '11)) 11)
@@ -255,10 +278,18 @@
   (test-equal (run-eval-e (pair? (cons '3 '4))) #t)
   (test-equal (run-eval-e (pair? null)) #f)
   (test-equal (run-eval-e (pair? '#t)) #f)
+
   (test-equal (run-eval-e (list)) #%null)
   (test-equal (run-eval-e (list '1 '2 '3))
-                (#%cons 1 (#%cons 2 (#%cons 3 #%null))))
+              (#%cons 1 (#%cons 2 (#%cons 3 #%null))))
 
+  (test-equal (run-eval-e ((lambda x x))) #%null)
+  (test-equal (run-eval-e ((lambda x x) '1 '#f '3))
+              (#%cons 1 (#%cons #f (#%cons 3 #%null))))
+
+  (test-equal (run-eval-e ((lambda (x1 x2) (dot x3) (cons x2 (cons x1 x3)))
+                           '5 '6 '7 '8 '9))
+              (#%cons 6 (#%cons 5 (#%cons 7 (#%cons 8 (#%cons 9 #%null))))))
   (jam-test))
 
 (module+ main
@@ -361,6 +392,13 @@
     [(#%plain-lambda (x ...) e)
      `(lambda ,(map syntax-e (attribute x)) ,(expr->pycketlite #'e))]
 
+    [(#%plain-lambda x:id e)
+     `(lambda ,(syntax-e #'x) ,(expr->pycketlite #'e))]
+
+    [(#%plain-lambda (x ... . y) e)
+     `(lambda ,(map syntax-e (attribute x)) (dot ,(syntax-e #'y))
+              ,(expr->pycketlite #'e))]
+
     [(if e1 e2 e3)
      `(if ,(expr->pycketlite #'e1)
           ,(expr->pycketlite #'e2)
@@ -378,6 +416,7 @@
   (define racket (find-executable-path "racket"))
 
   (match-define-values (base _ _) (split-path (quote-source-file)))
+  (void (system* racket (quote-source-file) "--build"))
   (define out (open-output-nowhere))
   (for ([p (directory-list (build-path base "racket") #:build? #t)]
         #:when (equal? (path-get-extension p) ".rkt")
