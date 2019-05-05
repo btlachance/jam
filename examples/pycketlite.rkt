@@ -13,7 +13,9 @@
   (x y z ::= variable-not-otherwise-mentioned)
   (c     ::= integer boolean)
 
-  (V ::= {env (lambda (x ...) e)} c prim+ prim- prim* primzero?)
+  (V ::= {env (lambda (x ...) e)} c
+         #%+ #%- #%* #%zero?
+         (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list)
   (k ::= (appk env (e ...) (V ...) k) (ifk env e e k)
          (defk (x) env P) (topk env P)))
 
@@ -24,8 +26,10 @@
    (where env (env-empty))
    (where env (env-extend
                env
-               (+ - * zero?)
-               (prim+ prim- prim* primzero?)))
+               (  +   -   *   zero?
+                  cons   null   car   cdr   null?   pair? list)
+               (#%+ #%- #%* #%zero?
+                #%cons #%null #%car #%cdr #%null? #%pair? #%list)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -42,20 +46,48 @@
    (where (x_rest ...) (toplevel-names (t ...)))])
 
 (define-metafunction pl
-  [(apply-op prim+ (integer_1 integer_2))
+  [(apply-op #%+ (integer_1 integer_2))
    (integer-add integer_1 integer_2)]
 
-  [(apply-op prim- (integer_1 integer_2))
+  [(apply-op #%- (integer_1 integer_2))
    (integer-subtract integer_1 integer_2)]
 
-  [(apply-op prim* (integer_1 integer_2))
+  [(apply-op #%* (integer_1 integer_2))
    (integer-multiply integer_1 integer_2)]
 
-  [(apply-op primzero? (0))
+  [(apply-op #%zero? (0))
    #t]
 
-  [(apply-op primzero? (V))
-   #f])
+  [(apply-op #%zero? (V))
+   #f]
+
+  [(apply-op #%cons (V_1 V_2))
+   (#%cons V_1 V_2)]
+
+  [(apply-op #%car ((#%cons V _)))
+   V]
+
+  [(apply-op #%cdr ((#%cons _ V)))
+   V]
+
+  [(apply-op #%null? (#%null))
+   #t]
+
+  [(apply-op #%null? (V))
+   #f]
+
+  [(apply-op #%pair? ((#%cons _ _)))
+   #t]
+
+  [(apply-op #%pair? (V))
+   #f]
+
+  [(apply-op #%list ())
+   #%null]
+
+  [(apply-op #%list (V V_rest ...))
+   ;; Unsafe because of RPython's bounded call-stack
+   (#%cons V (apply-op #%list (V_rest ...)))])
 
 (define-transition pl
   step
@@ -124,7 +156,7 @@
 
 (define-metafunction pl
   [(unload {env (lambda (x ...) e)}) v]
-  [(unload c) c])
+  [(unload V) V])
 
 ;; For now, eval-e is only really useful for internal testing. I don't
 ;; know/have a good way to set things up to use it with the --repl
@@ -215,6 +247,16 @@
                         (even? (- n '1)))))
                 (even? '100)))
               ())
+
+  (test-equal (run-eval-e (null? null)) #t)
+  (test-equal (run-eval-e (null? (cons '1 '2))) #f)
+  (test-equal (run-eval-e (null? '#t)) #f)
+  (test-equal (run-eval-e (pair? (cons '3 '4))) #t)
+  (test-equal (run-eval-e (pair? null)) #f)
+  (test-equal (run-eval-e (pair? '#t)) #f)
+  (test-equal (run-eval-e (list)) #%null)
+  (test-equal (run-eval-e (list '1 '2 '3))
+                (#%cons 1 (#%cons 2 (#%cons 3 #%null))))
 
   (jam-test))
 
@@ -337,6 +379,7 @@
   (match-define-values (base _ _) (split-path (quote-source-file)))
   (define out (open-output-nowhere))
   (for ([p (directory-list (build-path base "racket") #:build? #t)]
+        #:when (equal? (path-get-extension p) ".rkt")
         #:unless (equal? (path->string (file-name-from-path p)) "info.rkt"))
     (check-true
      (parameterize ([current-output-port out])
