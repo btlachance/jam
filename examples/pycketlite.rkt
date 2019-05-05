@@ -155,7 +155,7 @@
   #:control-string [(e _ _) e])
 
 (define-metafunction pl
-  [(unload {env (lambda (x ...) e)}) v]
+  [(unload {env (lambda (x ...) e)}) (lambda (x ...) e)]
   [(unload V) V])
 
 ;; For now, eval-e is only really useful for internal testing. I don't
@@ -178,6 +178,7 @@
   (test-equal (run-eval-e '#f) #f)
   (test-equal (run-eval-e (+ '1 '2)) 3)
   (test-equal (run-eval-e (- '2 '1)) 1)
+  (test-equal (run-eval-e (lambda (x) (x x))) (lambda (x) (x x)))
   (test-equal (run-eval-e ((lambda (x) x) '10)) 10)
   (test-equal (run-eval-e ((lambda (x y) x) '10 '11)) 10)
   (test-equal (run-eval-e ((lambda (x y) y) '10 '11)) 11)
