@@ -17,7 +17,8 @@
 
   (V ::= {env l} c
          #%+ #%- #%* #%zero?
-         (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list)
+         (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
+         #%apply)
   (k ::= (appk env (e ...) (V ...) k) (ifk env e e k)
          (defk (x) env P) (topk env P)))
 
@@ -29,9 +30,11 @@
    (where env (env-extend
                env
                (  +   -   *   zero?
-                  cons   null   car   cdr   null?   pair? list)
+                  cons   null   car   cdr   null?   pair?   list
+                  apply)
                (#%+ #%- #%* #%zero?
-                #%cons #%null #%car #%cdr #%null? #%pair? #%list)))
+                #%cons #%null #%car #%cdr #%null? #%pair? #%list
+                #%apply)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -153,6 +156,17 @@
        ;; (env-extend env_op (x ... y) (V_prefix ... V_rest))
        (where env_e (env-extend env_op (x ...) (V_prefix ...)))
        (where env_e (env-extend env_e (y) (V_rest)))]
+
+  [--> (V_0 (appk env () (V ...) k))
+       (V_arglast (appk env () (V_argother ...) k))
+       (where (#%apply V_fun V_args ...) (reverse (V ...)))
+       (where #%null V_0)
+       (where (V_arglast V_argother ...) (reverse (V_fun V_args ...)))]
+
+  [--> (V_0 (appk env () (V ...) k))
+       (V_cdr (appk env () (V_car V ...) k))
+       (where (#%apply V_fun V_args ...) (reverse (V ...)))
+       (where (#%cons V_car V_cdr) V_0)]
 
   [--> (V_0 (appk _ () (V ...) k))
        (V_result k)
@@ -290,6 +304,13 @@
   (test-equal (run-eval-e ((lambda (x1 x2) (dot x3) (cons x2 (cons x1 x3)))
                            '5 '6 '7 '8 '9))
               (#%cons 6 (#%cons 5 (#%cons 7 (#%cons 8 (#%cons 9 #%null))))))
+
+  (test-equal (run-eval-e (apply (lambda (x y) (+ x y)) '1 (list '2)))
+              3)
+  (test-equal (run-eval-e (apply (lambda (x y) (+ x y)) (list '3 '4)))
+              7)
+  (test-equal (run-eval-e (apply + '5 '6 null)) 11)
+
   (jam-test))
 
 (module+ main
