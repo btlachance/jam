@@ -18,7 +18,7 @@
   (V ::= {env l} c
          #%+ #%- #%* #%zero?
          (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
-         #%apply)
+         #%apply #%void)
   (k ::= (appk env (e ...) (V ...) k) (ifk env e e k)
          (defk (x) env P) (topk env P)))
 
@@ -31,10 +31,10 @@
                env
                (  +   -   *   zero?
                   cons   null   car   cdr   null?   pair?   list
-                  apply)
+                  apply   void)
                (#%+ #%- #%* #%zero?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
-                #%apply)))
+                #%apply #%void)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -91,7 +91,10 @@
    #%null]
 
   [(apply-op #%list (V V_rest ...))
-   (#%cons V (apply-op #%list (V_rest ...)))])
+   (#%cons V (apply-op #%list (V_rest ...)))]
+
+  [(apply-op #%void (V ...))
+   #%void])
 
 (define-metafunction pl
   [(prefix-and-rest () (V_rest ...))
@@ -310,6 +313,11 @@
   (test-equal (run-eval-e (apply (lambda (x y) (+ x y)) (list '3 '4)))
               7)
   (test-equal (run-eval-e (apply + '5 '6 null)) 11)
+  (test-equal (run-eval-e (apply (lambda () '0) null)) 0)
+
+  (test-equal (run-eval-e (void)) #%void)
+  (test-equal (run-eval-e (void void)) #%void)
+  (test-equal (run-eval-e (void '1 '2 '3)) #%void)
 
   (jam-test))
 
