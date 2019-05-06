@@ -330,10 +330,6 @@
               (interpreter-mode 'plain)]
 
    #:once-any
-   ;; TODO support running a program at a particular path. If we want
-   ;; to cache the term->json process, though, then we need to either
-   ;; change the evaluation handler or not go through the REPL (which
-   ;; is hard-coded into jam-run) since it does its own term->json
    ["--repl" "Start a REPL where each input is run as a separate program"
              (run 'repl)]
    ["--stdin" "Read a single program from stdin, and run it"
