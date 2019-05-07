@@ -6,7 +6,7 @@
   #:data ([env (environment x V)])
 
   (P     ::= (t ...))
-  (t     ::= e (define-values (x) e))
+  (t     ::= e (define-values (x ...) e))
   (e     ::= x l (quote c) (e e ...)
              (if e e e))
   (l     ::= (lambda (x ...) e) (lambda x e) (lambda (x ...) (dot x) e))
@@ -21,7 +21,7 @@
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
-  (k*    ::= (topk env P) (defk (x) env P) (cwvk V k)))
+  (k*    ::= (topk env P) (defk (x ...) env P) (cwvk V k)))
 
 (define-metafunction pl
   [(init-env (x_toplevel ...))
@@ -45,11 +45,16 @@
   [(toplevel-names (e t ...))
    (toplevel-names (t ...))]
 
-  [(toplevel-names ((define-values (x) _) t ...))
-   ;; Current template language doesn't allow (x ... x_rest ...)
-   ;; which looks a lot like appending two lists
+  ;; Ideally there would just be this one case for define-values
+  #;[(toplevel-names ((define-values (x ...) _) t ...))
+     (x ... ys ...)
+     (where (ys ...) (toplevel-names (t ...)))]
+
+  [(toplevel-names ((define-values () _) t ...))
+   (toplevel-names (t ...))]
+  [(toplevel-names ((define-values (x y ...) e) t ...))
    (x x_rest ...)
-   (where (x_rest ...) (toplevel-names (t ...)))])
+   (where (x_rest ...) (toplevel-names ((define-values (y ...) e) t ...)))])
 
 (define-metafunction pl
   [(apply-op #%+ (integer_1 integer_2))
@@ -112,8 +117,8 @@
   [--> (e (topk env P))
        (e env (topk env P))]
 
-  [--> ((define-values (x) e) (topk env P))
-       (e env (defk (x) env P))]
+  [--> ((define-values (x ...) e) (topk env P))
+       (e env (defk (x ...) env P))]
 
   [--> (x env k)
        (V k)
@@ -140,9 +145,9 @@
   [--> ((#%values V ...) (topk env_top P))
        (topk env_top P)]
 
-  [--> ((#%values V) (defk (x) env_top P))
+  [--> ((#%values V ...) (defk (x ...) env_top P))
        (topk env_top P)
-       (where () (env-set-cells env_top (x) (V)))]
+       (where () (env-set-cells env_top (x ...) (V ...)))]
 
   [--> (V_0 (appk env (e_arg e_args ...) (V ...) k))
        (e_arg env (appk env (e_args ...) (V_0 V ...) k))]
@@ -316,6 +321,13 @@
                 (values (+ '1 '2) '3)))
               ())
 
+  (test-equal (run-eval
+               ((define-values () (values))
+                (define-values (x) (values '1))
+                (define-values (y z) (values '2 '3))
+                (+ x (+ y z))))
+              ())
+
   (test-equal (run-eval-e (null? null)) #t)
   (test-equal (run-eval-e (null? (cons '1 '2))) #f)
   (test-equal (run-eval-e (null? '#t)) #f)
@@ -448,8 +460,8 @@
     [(#%plain-app call-with-values (lambda () e) print-values)
      (expr->pycketlite #'e)]
 
-    [(define-values (x) e)
-     `(define-values (,(syntax-e #'x)) ,(expr->pycketlite #'e))]))
+    [(define-values (x ...) e)
+     `(define-values ,(map syntax-e (attribute x)) ,(expr->pycketlite #'e))]))
 
 (define (expr->pycketlite e)
   (syntax-parse e
