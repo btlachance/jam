@@ -7,3 +7,8 @@
 (even? 0)
 (odd? 1)
 (even? 2)
+
+(let-values ([(y z) (values 2 3)]
+             [() (values)]
+             [(x) 1])
+  (- x (+ y z)))

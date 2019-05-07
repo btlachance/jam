@@ -7,8 +7,8 @@
 
   (P     ::= (t ...))
   (t     ::= e (define-values (x ...) e))
-  (e     ::= x l (quote c) (e e ...)
-             (if e e e))
+  (e     ::= x l (quote c) (e e ...) (if e e e)
+             (let-values ([(x ...) e] ...) e))
   (l     ::= (lambda (x ...) e) (lambda x e) (lambda (x ...) (dot x) e))
 
   (x y z ::= variable-not-otherwise-mentioned)
@@ -21,7 +21,14 @@
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
-  (k*    ::= (topk env P) (defk (x ...) env P) (cwvk V k)))
+  (k*    ::= (topk env P) (defk (x ...) env P) (cwvk V k)
+
+             ;; env               environment for remaining RHS
+             ;; (x ...)           variables the current RHS results will be bound to
+             ;; ([(x ...) e] ...) remaining variables to bind/RHS
+             ;; env               environment-in-progress for evaluating the body
+             ;; e                 body expression
+             (letk env (x ...) ([(x ...) e] ...) env e k)))
 
 (define-metafunction pl
   [(init-env (x_toplevel ...))
@@ -136,6 +143,11 @@
   [--> ((if e_test e_then e_else) env k)
        (e_test env (ifk env e_then e_else k))]
 
+  [--> ((let-values () e) env k)
+       (e env k)]
+
+  [--> ((let-values ([(x ...) e] [(x_rest ...) e_rest] ...) e_body) env k)
+       (e env (letk env (x ...) ([(x_rest ...) e_rest] ...) env e_body k))]
 
   [--> (V k*)
        ((#%values V) k*)]
@@ -199,6 +211,18 @@
        (V_result k)
        (where (V_op V ...) (reverse (V_0 V ...)))
        (where V_result (apply-op V_op (V ...)))]
+
+  [--> ((#%values V_new ...) (letk env_e (x_new ...)
+                                   ([(x ...) e] [(x_rest ...) e_rest] ...)
+                                   env_body e_body k))
+       (e env_e (letk env_e (x ...)
+                      ([(x_rest ...) e_rest] ...)
+                      env_body e_body k))
+       (where env_body (env-extend env_body (x_new ...) (V_new ...)))]
+
+  [--> ((#%values V_new ...) (letk _ (x_new ...) () env_body e_body k))
+       (e_body env_body k)
+       (where env_body (env-extend env_body (x_new ...) (V_new ...)))]
 
   [--> (#f (ifk env _ e_else k))
        (e_else env k)]
@@ -371,6 +395,18 @@
                                             (lambda (x y) (+ x y))))
               3)
 
+  (test-equal (run-eval-e (let-values () '0)) 0)
+  (test-equal (run-eval-e (let-values ([() (values)]) '42)) 42)
+  (test-equal (run-eval-e (let-values ([(x) '10]) (+ x '1))) 11)
+  (test-equal (run-eval-e (let-values ([(x) '1]
+                                       [(y z) (values '2 '3)])
+                            (- x (+ y z))))
+              -4)
+  (test-equal (run-eval-e (let-values ([(y z) (values '2 '3)]
+                                       [(x) '1])
+                            (- x (+ y z))))
+              -4)
+
   (jam-test))
 
 (module+ main
@@ -480,6 +516,12 @@
      `(if ,(expr->pycketlite #'e1)
           ,(expr->pycketlite #'e2)
           ,(expr->pycketlite #'e3))]
+
+    [(let-values ([(x ...) e] ...) e_body)
+     (let ([x* (syntax->datum #'((x ...) ...))]
+           [e* (map expr->pycketlite (attribute e))])
+       `(let-values ,(map list x* e*)
+          ,(expr->pycketlite #'e_body)))]
 
     [(quote {~or :exact-integer :boolean}) (syntax->datum this-syntax)]
 
