@@ -137,7 +137,7 @@
   [--> ((#%values V) k1)
        (V k1)]
 
-  [--> ((#%values V) (topk env_top P))
+  [--> ((#%values V ...) (topk env_top P))
        (topk env_top P)]
 
   [--> ((#%values V) (defk (x) env_top P))
@@ -306,6 +306,14 @@
                         '#f
                         (even? (- n '1)))))
                 (even? '100)))
+              ())
+
+  (test-equal (run-eval
+               ((values)
+                (values '#t)
+                (+ '1 (values '2))
+                (+ (values '1) '2)
+                (values (+ '1 '2) '3)))
               ())
 
   (test-equal (run-eval-e (null? null)) #t)
