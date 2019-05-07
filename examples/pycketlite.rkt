@@ -14,14 +14,14 @@
   (x y z ::= variable-not-otherwise-mentioned)
   (c     ::= integer boolean)
 
-  (V ::= {env l} c
-         #%+ #%- #%* #%zero?
-         (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
-         #%apply #%void #%values #%call-with-values)
+  (V     ::= {env l} c
+             #%+ #%- #%* #%zero?
+             (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
+             #%apply #%void #%values #%call-with-values)
 
-  (k ::= k1 k*)
-  (k1 ::= (appk env (e ...) (V ...) k) (ifk env e e k))
-  (k* ::= (topk env P) (defk (x) env P) (cwvk V k)))
+  (k     ::= k1 k*)
+  (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
+  (k*    ::= (topk env P) (defk (x) env P) (cwvk V k)))
 
 (define-metafunction pl
   [(init-env (x_toplevel ...))
