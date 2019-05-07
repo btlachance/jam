@@ -6,8 +6,7 @@
   #:data ([env (environment x V)])
 
   (P     ::= (t ...))
-  (t     ::= e (define-values (x) e)) ;; general-top-level-form but
-                                      ;; only with single-val define
+  (t     ::= e (define-values (x) e))
   (e     ::= x l (quote c) (e e ...)
              (if e e e))
   (l     ::= (lambda (x ...) e) (lambda x e) (lambda (x ...) (dot x) e))
@@ -18,9 +17,11 @@
   (V ::= {env l} c
          #%+ #%- #%* #%zero?
          (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
-         #%apply #%void)
-  (k ::= (appk env (e ...) (V ...) k) (ifk env e e k)
-         (defk (x) env P) (topk env P)))
+         #%apply #%void #%values #%call-with-values)
+
+  (k ::= k1 k*)
+  (k1 ::= (appk env (e ...) (V ...) k) (ifk env e e k))
+  (k* ::= (topk env P) (defk (x) env P) (cwvk V k)))
 
 (define-metafunction pl
   [(init-env (x_toplevel ...))
@@ -31,10 +32,10 @@
                env
                (  +   -   *   zero?
                   cons   null   car   cdr   null?   pair?   list
-                  apply   void)
+                  apply   void   values   call-with-values)
                (#%+ #%- #%* #%zero?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
-                #%apply #%void)))
+                #%apply #%void #%values #%call-with-values)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -131,10 +132,15 @@
        (e_test env (ifk env e_then e_else k))]
 
 
-  [--> (V (topk env_top P))
+  [--> (V k*)
+       ((#%values V) k*)]
+  [--> ((#%values V) k1)
+       (V k1)]
+
+  [--> ((#%values V) (topk env_top P))
        (topk env_top P)]
 
-  [--> (V (defk (x) env_top P))
+  [--> ((#%values V) (defk (x) env_top P))
        (topk env_top P)
        (where () (env-set-cells env_top (x) (V)))]
 
@@ -172,6 +178,19 @@
        (where (#%cons V_car V_cdr) V_0)]
 
   [--> (V_0 (appk _ () (V ...) k))
+       ((#%values V_vals ...) k)
+       (where (#%values V_vals ...) (reverse (V_0 V ...)))]
+
+  [--> (V_0 (appk _ () (V ...) k))
+       (e env (cwvk V_consumer k))
+       (where (#%call-with-values V_producer V_consumer) (reverse (V_0 V ...)))
+       (where {env (lambda () e)} V_producer)]
+
+  [--> ((#%values V ...) (cwvk V_consumer k))
+       (V_lastval (appk (env-empty) () (V ...) k))
+       (where (V_lastval V ...) (reverse (V_consumer V ...)))]
+
+  [--> (V_0 (appk _ () (V ...) k))
        (V_result k)
        (where (V_op V ...) (reverse (V_0 V ...)))
        (where V_result (apply-op V_op (V ...)))]
@@ -207,7 +226,7 @@
   eval-e
 
   #:load [--> e (topk (init-env ()) (e))]
-  #:unload [--> (V (topk _ ())) (unload V)]
+  #:unload [--> ((#%values V) (topk _ ())) (unload V)]
   #:transition step
   #:control-string [(e _ _) e])
 
@@ -318,6 +337,19 @@
   (test-equal (run-eval-e (void)) #%void)
   (test-equal (run-eval-e (void void)) #%void)
   (test-equal (run-eval-e (void '1 '2 '3)) #%void)
+
+  (test-equal (run-eval-e (call-with-values (lambda () (values))
+                                            (lambda () '42)))
+              42)
+  (test-equal (run-eval-e (call-with-values (lambda () '1)
+                                            (lambda (x) (+ x '42))))
+              43)
+  (test-equal (run-eval-e (call-with-values (lambda () (values '2))
+                                            (lambda (x) (* x '21))))
+              42)
+  (test-equal (run-eval-e (call-with-values (lambda () (values '1 '2))
+                                            (lambda (x y) (+ x y))))
+              3)
 
   (jam-test))
 
