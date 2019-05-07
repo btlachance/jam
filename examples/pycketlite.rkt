@@ -8,7 +8,8 @@
   (P     ::= (t ...))
   (t     ::= e (define-values (x ...) e))
   (e     ::= x l (quote c) (e e ...) (if e e e)
-             (let-values ([(x ...) e] ...) e))
+             (let-values ([(x ...) e] ...) e)
+             (letrec-values ([(x ...) e] ...) e))
   (l     ::= (lambda (x ...) e) (lambda x e) (lambda (x ...) (dot x) e))
 
   (x y z ::= variable-not-otherwise-mentioned)
@@ -24,11 +25,15 @@
   (k*    ::= (topk env P) (defk (x ...) env P) (cwvk V k)
 
              ;; env               environment for remaining RHS
-             ;; (x ...)           variables the current RHS results will be bound to
+             ;; (x ...)           variables the cpurrent RHS results will be bound to
              ;; ([(x ...) e] ...) remaining variables to bind/RHS
              ;; env               environment-in-progress for evaluating the body
              ;; e                 body expression
-             (letk env (x ...) ([(x ...) e] ...) env e k)))
+             (letk env (x ...) ([(x ...) e] ...) env e k)
+
+             ;; like letk, but with no environment-in-progress: all
+             ;; RHS (and the body) are evaluated in one environment
+             (letreck env (x ...) ([(x ...) e] ...) e k)))
 
 (define-metafunction pl
   [(init-env (x_toplevel ...))
@@ -52,16 +57,29 @@
   [(toplevel-names (e t ...))
    (toplevel-names (t ...))]
 
-  ;; Ideally there would just be this one case for define-values
-  #;[(toplevel-names ((define-values (x ...) _) t ...))
-     (x ... ys ...)
-     (where (ys ...) (toplevel-names (t ...)))]
-
+  ;; XXX could do this in one case if we could write (x ... ys ...)
   [(toplevel-names ((define-values () _) t ...))
    (toplevel-names (t ...))]
   [(toplevel-names ((define-values (x y ...) e) t ...))
    (x x_rest ...)
    (where (x_rest ...) (toplevel-names ((define-values (y ...) e) t ...)))])
+
+;; XXX if we could write templates like (x ... ...) then this
+;; metafunction wouldn't be necessary
+(define-metafunction pl
+  [(flatten-vars ())
+   ()]
+  [(flatten-vars (() (x ...) ...))
+   (flatten-vars ((x ...) ...))]
+  [(flatten-vars ((x_0 x_rest ...) (x ...) ...))
+   (x_0 x_flattened ...)
+   (where (x_flattened ...) (flatten-vars ((x_rest ...) (x ...) ...)))])
+
+(module+ test
+  (current-test-language pl)
+  (test-equal (flatten-vars ((x y))) (x y))
+  (test-equal (flatten-vars ((x y) () (z))) (x y z))
+  (jam-test))
 
 (define-metafunction pl
   [(apply-op #%+ (integer_1 integer_2))
@@ -146,8 +164,16 @@
   [--> ((let-values () e) env k)
        (e env k)]
 
-  [--> ((let-values ([(x ...) e] [(x_rest ...) e_rest] ...) e_body) env k)
-       (e env (letk env (x ...) ([(x_rest ...) e_rest] ...) env e_body k))]
+  [--> ((let-values ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) e_body) env k)
+       (e_first env (letk env (x_first ...) ([(x_rest ...) e_rest] ...) env e_body k))]
+
+  [--> ((letrec-values () e) env k)
+       (e env k)]
+
+  [--> ((letrec-values ([(x ...) e] ...) e_body) env k)
+       (e_first env_rec (letreck env_rec (x_first ...) ([(x_rest ...) e_rest] ...) e_body k))
+       (where ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) ([(x ...) e] ...))
+       (where env_rec (env-extend-cells env (flatten-vars ((x ...) ...))))]
 
   [--> (V k*)
        ((#%values V) k*)]
@@ -223,6 +249,18 @@
   [--> ((#%values V_new ...) (letk _ (x_new ...) () env_body e_body k))
        (e_body env_body k)
        (where env_body (env-extend env_body (x_new ...) (V_new ...)))]
+
+  [--> ((#%values V_new ...) (letreck env_rec (x_new ...)
+                                      ([(x ...) e] [(x_rest ...) e_rest] ...)
+                                      e_body k))
+       (e env_rec (letreck env_rec (x ...)
+                         ([(x_rest ...) e_rest] ...)
+                         e_body k))
+       (where () (env-set-cells env_rec (x_new ...) (V_new ...)))]
+
+  [--> ((#%values V_new ...) (letreck env_rec (x_new ...) () e_body k))
+       (e_body env_rec k)
+       (where () (env-set-cells env_rec (x_new ...) (V_new ...)))]
 
   [--> (#f (ifk env _ e_else k))
        (e_else env k)]
@@ -334,7 +372,7 @@
                     (if (zero? n)
                         '#f
                         (even? (- n '1)))))
-                (even? '100)))
+                (even? '10)))
               ())
 
   (test-equal (run-eval
@@ -406,6 +444,39 @@
                                        [(x) '1])
                             (- x (+ y z))))
               -4)
+
+  (test-equal (run-eval-e (letrec-values () '0)) 0)
+  (test-equal (run-eval-e (letrec-values ([() (values)]) '1)) 1)
+
+  (test-equal (run-eval-e
+               (letrec-values
+                   ([(even?)
+                     (lambda (n)
+                       (if (zero? n)
+                           '#t
+                           (odd? (- n '1))))]
+                    [(odd?)
+                     (lambda (n)
+                       (if (zero? n)
+                           '#f
+                           (even? (- n '1))))])
+                 (even? '10)))
+              #t)
+
+  (test-equal (run-eval-e
+               (letrec-values
+                   ([(even? odd?)
+                     (values
+                      (lambda (n)
+                        (if (zero? n)
+                            '#t
+                            (odd? (- n '1))))
+                      (lambda (n)
+                        (if (zero? n)
+                            '#f
+                            (even? (- n '1)))))])
+                 (even? '10)))
+              #t)
 
   (jam-test))
 

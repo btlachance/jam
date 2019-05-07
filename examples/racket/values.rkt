@@ -12,3 +12,15 @@
              [() (values)]
              [(x) 1])
   (- x (+ y z)))
+
+(letrec-values ([(even? odd?)
+                 (values
+                  (lambda (n)
+                    (if (zero? n)
+                        #t
+                        (odd? (- n 1))))
+                  (lambda (n)
+                    (if (zero? n)
+                        #f
+                        (even? (- n 1)))))])
+  (even? 10))
