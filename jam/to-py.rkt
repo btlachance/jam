@@ -174,7 +174,8 @@
   (define result
     (regexp-replaces (symbol->string name)
                      '((#rx"-"  "_")
-                       (#rx"\\?$" ""))))
+                       (#rx"\\?$" "")
+                       (#rx"\\*" "star"))))
 
   (match (sequence->list (generate-tokens (open-input-string result)))
     [(list `(NAME ,result . ,_) `(ENDMARKER . ,_))
