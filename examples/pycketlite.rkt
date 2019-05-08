@@ -25,14 +25,21 @@
   (k*    ::= (topk env P) (defk (x ...) env P) (cwvk V k)
 
              ;; env               environment for remaining RHS
-             ;; (x ...)           variables the cpurrent RHS results will be bound to
-             ;; ([(x ...) e] ...) remaining variables to bind/RHS
-             ;; env               environment-in-progress for evaluating the body
+             ;; (x ...)           variables the current RHS results will be bound to
+             ;; ([(x ...) e] ...) remaining variables to bind/RHS to evaluate
+             ;; ((x V) ...)       variables/values for evaluated RHS so far
              ;; e                 body expression
-             (letk env (x ...) ([(x ...) e] ...) env e k)
+             ;;
+             ;; (We could keep the list of variables/values as two
+             ;; lists instead of one zipped one if we had an explicit
+             ;; way to check that #values returned to the continuation
+             ;; matched #variables for the current RHS)
+             (letk env (x ...) ([(x ...) e] ...) ((x V) ...) e k)
 
-             ;; like letk, but with no environment-in-progress: all
-             ;; RHS (and the body) are evaluated in one environment
+             ;; Like letk but RHS and the body are evaluated in the
+             ;; same environment, and values are set in that
+             ;; environment once they're available, so no need for a
+             ;; separate list of variables/values so far
              (letreck env (x ...) ([(x ...) e] ...) e k)))
 (module+ test
   (current-test-language pl))
@@ -171,7 +178,8 @@
        (e env k)]
 
   [--> ((let-values ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) e_body) env k)
-       (e_first env (letk env (x_first ...) ([(x_rest ...) e_rest] ...) env e_body k))]
+       (e_first env (letk env (x_first ...) ([(x_rest ...) e_rest] ...)
+                          () e_body k))]
 
   [--> ((letrec-values () e) env k)
        (e env k)]
@@ -243,17 +251,18 @@
        (where (V_op V ...) (reverse (V_0 V ...)))
        (where V_result (apply-op V_op (V ...)))]
 
-  [--> ((#%values V_new ...) (letk env_e (x_new ...)
-                                   ([(x ...) e] [(x_rest ...) e_rest] ...)
-                                   env_body e_body k))
-       (e env_e (letk env_e (x ...)
-                      ([(x_rest ...) e_rest] ...)
-                      env_body e_body k))
-       (where env_body (env-extend env_body (x_new ...) (V_new ...)))]
+  [--> ((#%values V_new ...) (letk env_e (x_new ...) ([(x ...) e] [(x_rest ...) e_rest] ...)
+                                   ((x_sofar V_sofar) ...) e_body k))
+       (e env_e (letk env_e (x ...) ([(x_rest ...) e_rest] ...)
+                      (append ((x_new V_new) ...) ((x_sofar V_sofar) ...))
+                      e_body k))]
 
-  [--> ((#%values V_new ...) (letk _ (x_new ...) () env_body e_body k))
+  [--> ((#%values V_new ...) (letk env (x_new ...) ()
+                                   ((x_sofar V_sofar) ...) e_body k))
        (e_body env_body k)
-       (where env_body (env-extend env_body (x_new ...) (V_new ...)))]
+       (where env_body (env-extend env
+                                   (append (x_new ...) (x_sofar ...))
+                                   (append (V_new ...) (V_sofar ...))))]
 
   [--> ((#%values V_new ...) (letreck env_rec (x_new ...)
                                       ([(x ...) e] [(x_rest ...) e_rest] ...)
