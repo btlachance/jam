@@ -601,10 +601,10 @@
           ,(expr->pycketlite #'e2)
           ,(expr->pycketlite #'e3))]
 
-    [(let-values ([(x ...) e] ...) e_body)
+    [((~and form (~or let-values letrec-values)) ([(x ...) e] ...) e_body)
      (let ([x* (syntax->datum #'((x ...) ...))]
            [e* (map expr->pycketlite (attribute e))])
-       `(let-values ,(map list x* e*)
+       `(,(syntax-e #'form) ,(map list x* e*)
           ,(expr->pycketlite #'e_body)))]
 
     [(quote {~or :exact-integer :boolean}) (syntax->datum this-syntax)]
@@ -621,10 +621,9 @@
   (match-define-values (base _ _) (split-path (quote-source-file)))
   (parameterize ([current-output-port (open-output-nowhere)])
     (void (system* racket (quote-source-file) "--build")))
-  (define out (open-output-nowhere))
   (for ([p (directory-list (build-path base "racket") #:build? #t)]
-        #:when (equal? (path-get-extension p) ".rkt")
+        #:when (equal? (path-get-extension p) #".rkt")
         #:unless (equal? (path->string (file-name-from-path p)) "info.rkt"))
     (check-true
-     (parameterize ([current-output-port out])
+     (parameterize ([current-output-port (open-output-nowhere)])
        (system* racket (quote-source-file) "--racket" p)))))
