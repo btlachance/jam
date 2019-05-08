@@ -187,7 +187,8 @@
   (write-modules mods path*)
 
   (define (is-python? path) (regexp-match? #rx"\\.py$" path))
-  (define python (find-executable-path "python"))
+  (define python (or (find-executable-path "pypy")
+                     (find-executable-path "python")))
   (when python
     (define test-env (environment-variables-copy (current-environment-variables)))
     (parameterize ([current-environment-variables test-env])
