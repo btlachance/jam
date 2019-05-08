@@ -34,6 +34,8 @@
              ;; like letk, but with no environment-in-progress: all
              ;; RHS (and the body) are evaluated in one environment
              (letreck env (x ...) ([(x ...) e] ...) e k)))
+(module+ test
+  (current-test-language pl))
 
 (define-metafunction pl
   [(init-env (x_toplevel ...))
@@ -57,15 +59,9 @@
   [(toplevel-names (e t ...))
    (toplevel-names (t ...))]
 
-  ;; XXX could do this in one case if we could write (x ... ys ...)
-  [(toplevel-names ((define-values () _) t ...))
-   (toplevel-names (t ...))]
-  [(toplevel-names ((define-values (x y ...) e) t ...))
-   (x x_rest ...)
-   (where (x_rest ...) (toplevel-names ((define-values (y ...) e) t ...)))])
+  [(toplevel-names ((define-values (x ...) _) t ...))
+   (append (x ...) (toplevel-names (t ...)))])
 
-;; XXX if we could write templates like (x ... ...) then this
-;; metafunction wouldn't be necessary
 (define-metafunction pl
   [(flatten-vars ())
    ()]
@@ -75,11 +71,21 @@
    (x_0 x_flattened ...)
    (where (x_flattened ...) (flatten-vars ((x_rest ...) (x ...) ...)))])
 
+(define-metafunction pl
+  [(append () ((name any _) ...))
+   (any ...)]
+  [(append ((name any_first _) (name any_rest _) ...)
+           ((name any _) ...))
+   (any_first appended ...)
+   (where ((name appended _) ...) (append (any_rest ...) (any ...)))])
+
 (module+ test
-  (current-test-language pl)
   (test-equal (flatten-vars ((x y))) (x y))
   (test-equal (flatten-vars ((x y) () (z))) (x y z))
-  (jam-test))
+
+  (test-equal (append () (#t)) (#t))
+  (test-equal (append (1 2 3) (#t #f #t)) (1 2 3 #t #f #t))
+  (test-equal (append (1 #t 2) ()) (1 #t 2)))
 
 (define-metafunction pl
   [(apply-op #%+ (integer_1 integer_2))
@@ -204,10 +210,9 @@
        (e env_e k)
        (where ({env_op (lambda (x ...) (dot y) e)} V ...) (reverse (V_0 V ...)))
        (where ((V_prefix ...) V_rest) (prefix-and-rest (x ...) (V ...)))
-       ;; With append-like templates, this would instead be
-       ;; (env-extend env_op (x ... y) (V_prefix ... V_rest))
-       (where env_e (env-extend env_op (x ...) (V_prefix ...)))
-       (where env_e (env-extend env_e (y) (V_rest)))]
+       (where env_e (env-extend env_op
+                                (append (x ...) (y))
+                                (append (V_prefix ...) (V_rest))))]
 
   [--> (V_0 (appk env () (V ...) k))
        (V_arglast (appk env () (V_argother ...) k))
@@ -298,7 +303,6 @@
   #:control-string [(e _ _) e])
 
 (module+ test
-  (current-test-language pl)
   (test-equal (run-eval-e '5) 5)
   (test-equal (run-eval-e '#f) #f)
   (test-equal (run-eval-e (+ '1 '2)) 3)
