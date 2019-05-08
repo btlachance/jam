@@ -630,7 +630,7 @@
   (parameterize ([current-output-port (open-output-nowhere)])
     (void (system* racket (quote-source-file) "--build")))
   (for ([p (directory-list (build-path base "racket") #:build? #t)]
-        #:when (equal? (path-get-extension p) #".rkt")
+        #:when (path-has-extension? p ".rkt")
         #:unless (equal? (path->string (file-name-from-path p)) "info.rkt"))
     (check-true
      (parameterize ([current-output-port (open-output-nowhere)])
