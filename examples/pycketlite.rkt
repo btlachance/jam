@@ -256,13 +256,6 @@
        (e env_e (letk env_e (x ...) ([(x_rest ...) e_rest] ...)
                       (append ((x_new V_new) ...) ((x_sofar V_sofar) ...))
                       e_body k))
-       ;; XXX Moving the pattern into a where clause makes this
-       ;; translate without triggering an assertion error in
-       ;; RPython. Experimenting a bit makes me think triggering the
-       ;; "too many constants" assertion has something to do with the
-       ;; size of the guard/test for the original pattern (ie with the
-       ;; LHS of this where clause in place of (name sofar _) in the
-       ;; pattern)
        (where ((x_sofar V_sofar) ...) sofar)]
 
   [--> ((#%values V_new ...) (letk env (x_new ...) ()
