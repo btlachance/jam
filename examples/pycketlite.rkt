@@ -610,7 +610,8 @@
   (define racket (find-executable-path "racket"))
 
   (match-define-values (base _ _) (split-path (quote-source-file)))
-  (void (system* racket (quote-source-file) "--build"))
+  (parameterize ([current-output-port (open-output-nowhere)])
+    (void (system* racket (quote-source-file) "--build")))
   (define out (open-output-nowhere))
   (for ([p (directory-list (build-path base "racket") #:build? #t)]
         #:when (equal? (path-get-extension p) ".rkt")
