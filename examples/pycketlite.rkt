@@ -21,7 +21,7 @@
              #%+ #%- #%* #%zero?
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
-             #%vector #%vector-immutable #%vector-ref #%vector-length)
+             #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!)
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
@@ -57,11 +57,11 @@
                (  +   -   *   zero?
                   cons   null   car   cdr   null?   pair?   list
                   apply   void   values   call-with-values
-                  vector   vector-immutable   vector-ref   vector-length)
+                  vector   vector-immutable   vector-ref   vector-length   vector-set!)
                (#%+ #%- #%* #%zero?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
                 #%apply #%void #%values #%call-with-values
-                #%vector #%vector-immutable #%vector-ref #%vector-length)))
+                #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -155,13 +155,17 @@
    (mvec-element-at mvec integer)]
 
   [(apply-op #%vector-ref (ivec integer))
-   (ivec-element-at mvec integer)]
+   (ivec-element-at ivec integer)]
 
   [(apply-op #%vector-length (mvec))
    (mvec-length mvec)]
 
   [(apply-op #%vector-length (ivec))
-   (ivec-length ivec)])
+   (ivec-length ivec)]
+
+  [(apply-op #%vector-set! (mvec integer V))
+   #%void
+   (where () (mvec-set mvec integer V))])
 
 
 (define-metafunction pl

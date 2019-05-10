@@ -18,4 +18,6 @@
 (vector-ref (vector-immutable 1) 0)
 (vector-ref (vector-immutable 4 5 6) 2)
 
-
+(define v (vector #t))
+(vector-set! v 0 123)
+(vector-ref v 0)
