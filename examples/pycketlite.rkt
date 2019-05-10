@@ -3,7 +3,9 @@
 (provide pl)
 
 (define-language pl
-  #:data ([env (environment x V)])
+  #:data ([env (environment x V)]
+          [mvec (mutable-sequence V)]
+          [ivec (immutable-sequence V)])
 
   (P     ::= (t ...))
   (t     ::= e (define-values (x ...) e))
@@ -15,10 +17,11 @@
   (x y z ::= variable-not-otherwise-mentioned)
   (c     ::= integer boolean)
 
-  (V     ::= {env l} c
+  (V     ::= {env l} c mvec ivec
              #%+ #%- #%* #%zero?
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
-             #%apply #%void #%values #%call-with-values)
+             #%apply #%void #%values #%call-with-values
+             #%vector #%vector-immutable #%vector-ref #%vector-length)
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
@@ -53,10 +56,12 @@
                env
                (  +   -   *   zero?
                   cons   null   car   cdr   null?   pair?   list
-                  apply   void   values   call-with-values)
+                  apply   void   values   call-with-values
+                  vector   vector-immutable   vector-ref   vector-length)
                (#%+ #%- #%* #%zero?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
-                #%apply #%void #%values #%call-with-values)))
+                #%apply #%void #%values #%call-with-values
+                #%vector #%vector-immutable #%vector-ref #%vector-length)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -138,7 +143,26 @@
    (#%cons V (apply-op #%list (V_rest ...)))]
 
   [(apply-op #%void (V ...))
-   #%void])
+   #%void]
+
+  [(apply-op #%vector (V ...))
+   (mvec-of-elements V ...)]
+
+  [(apply-op #%vector-immutable (V ...))
+   (ivec-of-elements V ...)]
+
+  [(apply-op #%vector-ref (mvec integer))
+   (mvec-element-at mvec integer)]
+
+  [(apply-op #%vector-ref (ivec integer))
+   (ivec-element-at mvec integer)]
+
+  [(apply-op #%vector-length (mvec))
+   (mvec-length mvec)]
+
+  [(apply-op #%vector-length (ivec))
+   (ivec-length ivec)])
+
 
 (define-metafunction pl
   [(prefix-and-rest () (V_rest ...))
