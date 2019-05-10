@@ -649,6 +649,8 @@
   (for ([p (directory-list (build-path base "racket") #:build? #t)]
         #:when (path-has-extension? p ".rkt")
         #:unless (equal? (path->string (file-name-from-path p)) "info.rkt"))
-    (check-true
-     (parameterize ([current-output-port (open-output-nowhere)])
-       (system* racket (quote-source-file) "--racket" p)))))
+    (define out (open-output-string))
+    (parameterize ([current-output-port out])
+      (system* racket (quote-source-file) "--racket" p))
+    (check-equal? (get-output-string out) "()\n")))
+
