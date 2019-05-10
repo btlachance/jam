@@ -56,7 +56,7 @@
 
 (define rep/c
   (rename-contract
-   (or/c nt:plain? nt:environment?)
+   (or/c nt:plain? nt:environment? nt:mutable-sequence? nt:immutable-sequence?)
    "a nonterminal rep"))
 
 (define (lang-grammar-module lang)
@@ -410,7 +410,11 @@
                      #:metafun (list mmod-handle)))
 
 (define builtins
-  (hash 'environment ((curry nt:environment) 'is_environment)))
+  (hash
+   'environment ((curry nt:environment) 'is_environment)
+   'mutable-sequence ((curry nt:mutable-sequence) 'is_mutable_sequence)
+   'immutable-sequence ((curry nt:immutable-sequence) 'is_immutable_sequence)
+   ))
 
 (define predefined-metafunctions
   (list
@@ -419,55 +423,99 @@
     (mf:data 'list_reverse (repeat-pattern '_)))
    (metafunction
     'integer-add
-    (mf:data 'integer_add0 (pattern-of-ps (list 'integer 'integer))))
+    (mf:data 'integer_add0 (pattern-of-ps (list integer-pattern integer-pattern))))
    (metafunction
     'integer-subtract
-    (mf:data 'integer_subtract0 (pattern-of-ps (list 'integer 'integer))))
+    (mf:data 'integer_subtract0 (pattern-of-ps (list integer-pattern integer-pattern))))
    (metafunction
     'integer-multiply
-    (mf:data 'integer_multiply0 (pattern-of-ps (list 'integer 'integer))))
+    (mf:data 'integer_multiply0 (pattern-of-ps (list integer-pattern integer-pattern))))
    (metafunction
     'clock-milliseconds
     (mf:data 'clock_milliseconds (pattern-of-ps '())))
    ))
 
 (define (nonterminal-metafunctions nt-names nts rep)
+  (define (environment-metafunctions nt-name nt kp vp)
+    (define (mf-name suffix) (format-symbol "~a-~a" nt-name suffix))
+    (list (metafunction
+           (mf-name 'lookup)
+           (mf:data 'environment_lookup (pattern-of-ps (list nt kp))))
+
+          (metafunction
+           (mf-name 'bound?)
+           (mf:data 'environment_is_bound (pattern-of-ps (list nt kp))))
+
+          (metafunction
+           (mf-name 'extend1)
+           (mf:data 'environment_extend1 (pattern-of-ps (list nt kp vp))))
+
+          (let ([kps (repeat-pattern kp)]
+                [vps (repeat-pattern vp)])
+            (metafunction
+             (mf-name 'extend)
+             (mf:data 'environment_extend (pattern-of-ps (list nt kps vps)))))
+
+          (let ([kps (repeat-pattern kp)])
+            (metafunction
+             (mf-name 'extend-cells)
+             (mf:data 'environment_extend_cells (pattern-of-ps (list nt kps)))))
+
+          (let ([kps (repeat-pattern kp)]
+                [vps (repeat-pattern vp)])
+            (metafunction
+             (mf-name 'set-cells)
+             (mf:data 'environment_set_cells (pattern-of-ps (list nt kps vps)))))
+
+          (metafunction
+           (mf-name 'empty)
+           (mf:data 'environment_empty (pattern-of-ps '())))))
+
+  (define (mutable-sequence-metafunctions nt-name nt ep)
+    (define (mf-name suffix) (format-symbol "~a-~a" nt-name suffix))
+    (list (metafunction
+           (mf-name 'of-elements)
+           (mf:data 'mutable_sequence_of (repeat-pattern ep)))
+          (metafunction
+           (mf-name 'element-at)
+           (mf:data 'sequence_element_at (pattern-of-ps (list nt integer-pattern))))
+          (metafunction
+           (mf-name 'set)
+           (mf:data 'sequence_set (pattern-of-ps (list nt integer-pattern ep))))
+          (metafunction
+           (mf-name 'length)
+           (mf:data 'sequence_length (pattern-of-ps (list nt))))))
+
+  (define (immutable-sequence-metafunctions nt-name nt ep)
+    (define (mf-name suffix) (format-symbol "~a-~a" nt-name suffix))
+    (list (metafunction
+           (mf-name 'of-elements)
+           (mf:data 'immutable_sequence_of (repeat-pattern ep)))
+          (metafunction
+           (mf-name 'element-at)
+           (mf:data 'sequence_element_at (pattern-of-ps (list nt integer-pattern))))
+          (metafunction
+           (mf-name 'length)
+           (mf:data 'sequence_length (pattern-of-ps (list nt))))))
+
   (match rep
     [(nt:environment _ kp vp)
      (apply
       append
       (for/list ([nt-name nt-names]
                  [nt nts])
-        (define (mf-name suffix) (format-symbol "~a-~a" nt-name suffix))
-        (list (metafunction
-               (mf-name 'lookup)
-               (mf:data 'environment_lookup (pattern-of-ps (list nt kp))))
+        (environment-metafunctions nt-name nt kp vp)))]
 
-              (metafunction
-               (mf-name 'bound?)
-               (mf:data 'environment_is_bound (pattern-of-ps (list nt kp))))
+    [(nt:mutable-sequence _ ep)
+     (apply
+      append
+      (for/list ([nt-name nt-names]
+                 [nt nts])
+        (mutable-sequence-metafunctions nt-name nt ep)))]
 
-              (metafunction
-               (mf-name 'extend1)
-               (mf:data 'environment_extend1 (pattern-of-ps (list nt kp vp))))
-
-              (let ([kps (repeat-pattern kp)]
-                    [vps (repeat-pattern vp)])
-                (metafunction
-                 (mf-name 'extend)
-                 (mf:data 'environment_extend (pattern-of-ps (list nt kps vps)))))
-
-              (let ([kps (repeat-pattern kp)])
-                (metafunction
-                 (mf-name 'extend-cells)
-                 (mf:data 'environment_extend_cells (pattern-of-ps (list nt kps)))))
-
-              (let ([kps (repeat-pattern kp)]
-                    [vps (repeat-pattern vp)])
-                (metafunction
-                 (mf-name 'set-cells)
-                 (mf:data 'environment_set_cells (pattern-of-ps (list nt kps vps)))))
-
-              (metafunction
-               (mf-name 'empty)
-               (mf:data 'environment_empty (pattern-of-ps '()))))))]))
+    [(nt:immutable-sequence _ ep)
+     (apply
+      append
+      (for/list ([nt-name nt-names]
+                 [nt nts])
+        (immutable-sequence-metafunctions nt-name nt ep)))]))

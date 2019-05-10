@@ -228,6 +228,13 @@
         'environment_set_cells 'environment_set_cells
         'environment_empty 'environment_empty
         'clock_milliseconds 'clock_milliseconds
+        'mutable_sequence_of 'mutable_sequence_of
+        'immutable_sequence_of 'immutable_sequence_of
+        'is_mutable_sequence 'is_mutable_sequence
+        'is_immutable_sequence 'is_immutable_sequence
+        'sequence_element_at 'sequence_element_at
+        'sequence_set 'sequence_set
+        'sequence_length 'sequence_length
         ))
 ;; A cheap way to test that this hash is partly consistent with
 ;; core.py is to generate a python module that tries to import all of

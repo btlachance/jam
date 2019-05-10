@@ -14,6 +14,10 @@ def subclass_responsibility0(self):
 def subclass_responsibility1(self, v):
   bail("internal: Subclass responsibility")
 
+@specialize.call_location()
+def subclass_responsibility2(self, v):
+  bail("internal: Subclass responsibility")
+
 class W_Term(object):
   _immutable_fields_ = ['static']
 
@@ -777,6 +781,95 @@ def list_reverse(t):
 def clock_milliseconds(t):
   [] = [x for x in W_TermList(t)]
   return make_integer(int(time.clock() * 1000))
+
+class W_Sequence(W_Term):
+  def __init__(self):
+    W_Term.__init__(self)
+
+  elements = subclass_responsibility0
+  set = subclass_responsibility2
+
+  def atoms_equal(self, other):
+    return False
+  def to_string(self):
+    return "#%sequence"
+  def length(self):
+    return len(self.elements())
+  def element_at(self, i):
+    return self.elements()[i]
+
+class W_MutableSequence(W_Sequence):
+  def __init__(self, xs):
+    W_Sequence.__init__(self)
+    self.xs = xs
+  def elements(self):
+    return self.xs
+  def set(self, i, x):
+    self.xs[i] = x
+class W_ImmutableSequence(W_Sequence):
+  _immutable_fields_ = ['xs[*]']
+  def __init__(self, xs):
+    W_Sequence.__init__(self)
+    self.xs = xs[:]
+  def elements(self):
+    return self.xs
+  def set(self, i, x):
+    bail("set only works on mutable sequences; got an immutable sequence")
+
+def mutable_sequence_of(t):
+  xs = [x for x in W_TermList(t)]
+  return W_MutableSequence(xs)
+
+def immutable_sequence_of(t):
+  xs = [x for x in W_TermList(t)]
+  return W_ImmutableSequence(xs)
+
+def sequence_element_at(t):
+  [seq, i] = [x for x in W_TermList(t)]
+  return seq.element_at(i.int_value())
+
+def sequence_set(t):
+  [seq, i, x] = [x for x in W_TermList(t)]
+  seq.set(i.int_value(), x)
+  return make_nil()
+
+def sequence_length(t):
+  [seq] = [x for x in W_TermList(t)]
+  return make_integer(seq.length())
+
+def is_mutable_sequence(v):
+  return isinstance(v, W_MutableSequence)
+def is_immutable_sequence(v):
+  return isinstance(v, W_ImmutableSequence)
+
+def test_seq():
+  mut0 = mutable_sequence_of(make_nil())
+  immut0 = immutable_sequence_of(make_nil())
+  assert mut0.length() == 0
+  assert is_mutable_sequence(mut0)
+  assert not(is_mutable_sequence(immut0))
+  assert immut0.length() == 0
+  assert is_immutable_sequence(immut0)
+  assert not(is_immutable_sequence(mut0))
+
+  elems = term_list([make_integer(3), make_integer(5), make_integer(7)])
+  mut3 = mutable_sequence_of(elems)
+  immut3 = immutable_sequence_of(elems)
+  assert mut3.length() == 3
+  assert immut3.length() == 3
+
+  assert mut3.element_at(0).int_value() == 3
+  assert mut3.element_at(1).int_value() == 5
+  assert mut3.element_at(2).int_value() == 7
+  mut3.set(1, make_nil())
+  assert mut3.element_at(0).int_value() == 3
+  assert mut3.element_at(1).is_nil()
+
+  assert immut3.element_at(0).int_value() == 3
+  assert immut3.element_at(1).int_value() == 5
+  assert immut3.element_at(2).int_value() == 7
+  with pytest.raises(JamError):
+    immut3.set(1, make_nil)
 
 if __name__ == "__test__":
   pytest.main([__file__, "-q"])

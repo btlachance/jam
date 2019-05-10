@@ -11,7 +11,9 @@
          translate-modules lift-procs
          grammar-handle evaluator-handle core-handle
          (struct-out name) (struct-out literal) clause mf-apply pair
-         nonterminal pattern-of-ps repeat-pattern)
+         nonterminal pattern-of-ps repeat-pattern integer-pattern)
+
+(define integer-pattern 'integer)
 
 ;; a datum is one of
 ;; - symbol
@@ -49,7 +51,7 @@
 (define (fold-pattern-literals f z p)
   (match p
     ['_ z]
-    ['integer z]
+    [(== integer-pattern) z]
     ['boolean z]
     ['variable-not-otherwise-mentioned z]
     [(nonterminal _) z]
@@ -60,7 +62,7 @@
     [(pair p lp)
      (fold-pattern-literals f (fold-pattern-literals f z lp) p)]))
 
-(define pattern-keywords (set '_ 'integer 'variable-not-otherwise-mentioned 'boolean))
+(define pattern-keywords (set '_ integer-pattern 'variable-not-otherwise-mentioned 'boolean))
 (define (pattern-keyword? x)
   (match x
     [(? identifier? id)
@@ -123,7 +125,7 @@
     ['_
      #t]
 
-    ['integer
+    [(== integer-pattern)
      `(integer? ,source)]
 
     ['boolean
@@ -181,7 +183,7 @@
                  ;; this would be even rarer
      (hash)]
 
-    [(or (and s (or 'integer 'variable-not-otherwise-mentioned 'boolean))
+    [(or (and s (or (== integer-pattern) 'variable-not-otherwise-mentioned 'boolean))
          (nonterminal s)
          (literal (? symbol? s))
          (name s _))
@@ -200,7 +202,7 @@
 (define (free-vars p)
   (match p
     [(or '_ '()) (set)]
-    [(or (and x (or 'integer 'variable-not-otherwise-mentioned 'boolean))
+    [(or (and x (or (== integer-pattern) 'variable-not-otherwise-mentioned 'boolean))
          (literal (? symbol? x)))
      (set x)]
     [(name x _) (set x)]
@@ -233,7 +235,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
   (match template
     [(mf-apply lang-name name rand)
      `(mf-apply (lang ,lang-name) ,name ,(compile/t rand))]
-    [(and x (or 'integer 'variable-not-otherwise-mentioned 'boolean))
+    [(and x (or (== integer-pattern) 'variable-not-otherwise-mentioned 'boolean))
      (unless (dict-has-key? env x)
        (error 'compile/transcribe "keyword in template is unbound\n\
   keyword: ~a" x))
@@ -653,7 +655,9 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
         (for/hash ([name (cdr names)])
           (values (pred-name name) (proc* '(t) `(call ,(lexical-var* primary-name) ,(lexical-var* 't))))))]
 
-      [(nt:environment pred-py-name _ _)
+      [(or (nt:environment pred-py-name _ _)
+           (nt:mutable-sequence pred-py-name _)
+           (nt:immutable-sequence pred-py-name _))
        (define primary-ir
          (proc* '(t) `(call ,(internal-ref pred-py-name pred-py-name)
                             ,(lexical-var* 't))))

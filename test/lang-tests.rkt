@@ -237,3 +237,21 @@
   (test-not-equal (clock-milliseconds) 0)
   (test-equal (integer-multiply (clock-milliseconds) 0) 0)
   (jam-test))
+
+(define-language vec
+  #:data ([mvec (mutable-sequence boolean)]
+          [ivec (immutable-sequence boolean)]))
+(define-metafunction vec
+  [(mut-test)
+   (mvec-element-at mvec 1)
+   (where mvec (mvec-of-elements #t #t #t))
+   (where () (mvec-set mvec 1 #f))])
+(module+ test
+  (current-test-language vec)
+  (test-equal (mvec-length (mvec-of-elements)) 0)
+  (test-equal (mvec-length (mvec-of-elements #t #f)) 2)
+  (test-equal (mut-test) #f)
+
+  (test-equal (ivec-length (ivec-of-elements)) 0)
+  (test-equal (ivec-length (ivec-of-elements #t #f #t)) 3)
+  (jam-test))

@@ -3,6 +3,8 @@
  (struct-out nonterminal)
  (struct-out nt:plain)
  (struct-out nt:environment)
+ (struct-out nt:mutable-sequence)
+ (struct-out nt:immutable-sequence)
 
  (struct-out metafunction)
  (struct-out mf:plain)
@@ -17,9 +19,13 @@
 
 ;; a nt:rep is one of
 ;; - (nt:plain (listof pattern))
-;; - (nt:environment pattern pattern)
+;; - (nt:environment symbol pattern pattern)
+;; - (nt:mutable-sequence symbol pattern)
+;; - (nt:immutable-sequence symbol pattern)
 (struct nt:plain (rhss) #:transparent)
 (struct nt:environment (pred-py-name key-pattern value-pattern) #:transparent)
+(struct nt:mutable-sequence (pred-py-name element-pattern) #:transparent)
+(struct nt:immutable-sequence (pred-py-name element-pattern) #:transparent)
 
 ;; a metafunction is a (metafunction symbol mf:rep)
 ;; a mf:rep is one of
