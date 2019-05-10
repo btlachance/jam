@@ -8,6 +8,9 @@
 (odd? 1)
 (even? 2)
 
+values
+(apply values 1 2 (cons 3 null))
+
 (let-values ([(y z) (values 2 3)]
              [() (values)]
              [(x) 1])
