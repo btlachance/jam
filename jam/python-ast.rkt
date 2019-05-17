@@ -186,6 +186,10 @@
        (pp-python-stmt body))
      (for ([handler handlers])
        (match handler
+         [`(finally ,rhs)
+          (displayln (~a (current-indent) "finally:"))
+          (with-indented
+            (pp-python-stmt rhs))]
          [`(,e ,rhs)
           (displayln (~a (current-indent) "except " (format-name e) ":"))
           (with-indented
@@ -341,7 +345,8 @@
               (import exceptions)
               (try 0
                    (Exception 1)
-                   ((exceptions dot Exception) as e 2))))
+                   ((exceptions dot Exception) as e 2)
+                   (finally (assert True "finally")))))
         (for ([exp '((a dot __repr__)
                      (list a b c)
                      (tuple a)
