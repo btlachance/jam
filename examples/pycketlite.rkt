@@ -15,14 +15,15 @@
   (l     ::= (lambda (x ...) e) (lambda x e) (lambda (x ...) (dot x) e))
 
   (x y z ::= variable-not-otherwise-mentioned)
-  (c     ::= integer boolean)
+  (c     ::= integer boolean string)
 
   (V     ::= {env l} c mvec ivec
              #%+ #%- #%* #%zero?
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
              #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
-             #%current-command-line-arguments)
+             #%current-command-line-arguments
+             #%string-append)
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
@@ -59,12 +60,14 @@
                   cons   null   car   cdr   null?   pair?   list
                   apply   void   values   call-with-values
                   vector   vector-immutable   vector-ref   vector-length   vector-set!
-                  current-command-line-arguments)
+                  current-command-line-arguments
+                  string-append)
                (#%+ #%- #%* #%zero?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
                 #%apply #%void #%values #%call-with-values
                 #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
-                #%current-command-line-arguments)))
+                #%current-command-line-arguments
+                #%string-append)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -171,7 +174,12 @@
    (where () (mvec-set mvec integer V))]
 
   [(apply-op #%current-command-line-arguments ())
-   (ivec-of-elements)])
+   (ivec-of-elements)]
+
+  [(apply-op #%string-append ()) ""]
+
+  [(apply-op #%string-append (string_0 string ...))
+   (string-append string_0 (apply-op #%string-append (string ...)))])
 
 
 (define-metafunction pl
@@ -526,6 +534,15 @@
                  (even? '10)))
               #t)
 
+  (test-equal (run-eval-e '"hello") "hello")
+
+  ;; XXX In the test form (string-append) parses as a metafunction
+  ;; application, not as an object-language application expression. I
+  ;; don't yet have a good way to write terms in jam that won't clash
+  ;; with the specification. So, don't try to test string-append with
+  ;; test-equal.
+  ;; (test-equal (run-eval-e (string-append)) "")
+
   (test-equal (run-eval-e (vector-length (current-command-line-arguments))) 0)
 
   (jam-test))
@@ -593,7 +610,7 @@
        (define stx (read-syntax))
        (begin0 (unless (eof-object? stx)
                  (define p (module->pycketlite (expand stx)))
-                 (parameterize ([current-input-port (open-input-string (~a p))])
+                 (parameterize ([current-input-port (open-input-string (~s p))])
                    (jam-run pl eval
                      #:path dest
                      #:translate? translate?
@@ -644,7 +661,8 @@
        `(,(syntax-e #'form) ,(map list x* e*)
           ,(expr->pycketlite #'e_body)))]
 
-    [(quote {~or :exact-integer :boolean}) (syntax->datum this-syntax)]
+    [(quote {~or :exact-integer :boolean :string})
+     (syntax->datum this-syntax)]
 
     [(#%plain-app e e* ...)
      (cons (expr->pycketlite #'e) (map expr->pycketlite (attribute e*)))]
