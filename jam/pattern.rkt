@@ -11,18 +11,22 @@
          translate-modules lift-procs
          grammar-handle evaluator-handle core-handle
          (struct-out name) (struct-out literal) clause mf-apply pair
-         nonterminal pattern-of-ps repeat-pattern integer-pattern)
+         nonterminal pattern-of-ps repeat-pattern integer-pattern
+         string-pattern)
 
 (define integer-pattern 'integer)
+(define string-pattern 'string)
 
 ;; a datum is one of
 ;; - symbol
 ;; - integer
+;; - string
 ;; - boolean
 
 ;; a pattern is one of
 ;; - '_
 ;; - 'integer
+;; - 'string
 ;; - 'boolean
 ;; - 'variable-not-otherwise-mentioned
 ;; - (nonterminal symbol)
@@ -52,6 +56,7 @@
   (match p
     ['_ z]
     [(== integer-pattern) z]
+    [(== string-pattern) z]
     ['boolean z]
     ['variable-not-otherwise-mentioned z]
     [(nonterminal _) z]
@@ -62,7 +67,7 @@
     [(pair p lp)
      (fold-pattern-literals f (fold-pattern-literals f z lp) p)]))
 
-(define pattern-keywords (set '_ integer-pattern 'variable-not-otherwise-mentioned 'boolean))
+(define pattern-keywords (set '_ integer-pattern string-pattern 'variable-not-otherwise-mentioned 'boolean))
 (define (pattern-keyword? x)
   (match x
     [(? identifier? id)
@@ -128,6 +133,9 @@
     [(== integer-pattern)
      `(integer? ,source)]
 
+    [(== string-pattern)
+     `(string? ,source)]
+
     ['boolean
      `(boolean? ,source)]
 
@@ -145,6 +153,9 @@
 
     [(literal (? exact-integer? n))
      `(= (integer ,n) ,source)]
+
+    [(literal (? string? s))
+     `(= (string ,s) ,source)]
 
     [(literal (? boolean? b))
      `(= (boolean ,b) ,source)]
@@ -169,6 +180,7 @@
          ;; this means literal integers and nil in a template might
          ;; need to be freshly allocated
          (literal (? exact-integer? _))
+         (literal (? string? _))
          (literal (? boolean? _)))
      (hash)]
 
@@ -183,7 +195,7 @@
                  ;; this would be even rarer
      (hash)]
 
-    [(or (and s (or (== integer-pattern) 'variable-not-otherwise-mentioned 'boolean))
+    [(or (and s (or (== integer-pattern) (== string-pattern) 'variable-not-otherwise-mentioned 'boolean))
          (nonterminal s)
          (literal (? symbol? s))
          (name s _))
@@ -202,7 +214,7 @@
 (define (free-vars p)
   (match p
     [(or '_ '()) (set)]
-    [(or (and x (or (== integer-pattern) 'variable-not-otherwise-mentioned 'boolean))
+    [(or (and x (or (== integer-pattern) (== string-pattern) 'variable-not-otherwise-mentioned 'boolean))
          (literal (? symbol? x)))
      (set x)]
     [(name x _) (set x)]
@@ -235,7 +247,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
   (match template
     [(mf-apply lang-name name rand)
      `(mf-apply (lang ,lang-name) ,name ,(compile/t rand))]
-    [(and x (or (== integer-pattern) 'variable-not-otherwise-mentioned 'boolean))
+    [(and x (or (== integer-pattern) (== string-pattern) 'variable-not-otherwise-mentioned 'boolean))
      (unless (dict-has-key? env x)
        (error 'compile/transcribe "keyword in template is unbound\n\
   keyword: ~a" x))
@@ -270,6 +282,9 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 
     [(literal (? exact-integer? n))
      `(integer ,n)]
+
+    [(literal (? string? s))
+     `(string ,s)]
 
     [(literal (? boolean? b))
      `(boolean ,b)]
@@ -379,7 +394,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                                 prefix
                                 (nonterminal prefix)))]
 
-      [{~or :jam-id :integer :boolean}
+      [{~or :jam-id :integer :boolean :string}
        (literal (syntax-e this-syntax))]
 
       [(name x:jam-id p)
@@ -578,6 +593,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
     [`(pair ,hd ,tl) (call-prim 'pair (translate hd) (translate tl))]
     [`(symbol ,s) (call-prim 'symbol (symbol->string s))]
     [`(integer ,n) (call-prim 'integer n)]
+    [`(string ,s) (call-prim 'string s)]
     [`(boolean ,b) (call-prim 'boolean b)]
 
     [`(hd ,arg) (call-prim 'hd (translate arg))]
@@ -593,6 +609,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
     [`(pair? ,arg) (call-prim 'pair? (translate arg))]
     [`(symbol? ,arg) (call-prim 'symbol? (translate arg))]
     [`(integer? ,arg) (call-prim 'integer? (translate arg))]
+    [`(string? ,arg) (call-prim 'string? (translate arg))]
     [`(boolean? ,arg) (call-prim 'boolean? (translate arg))]
     [`(list? ,arg) (call-prim 'list? (translate arg))]
     [(print-term* ir) (call-prim 'print-term (translate ir))]
@@ -877,7 +894,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                       (append (list core-handle) other-handles)))
       (provide)
 
-      ,@(for/list ([t '(() 5 x (x y) (let ([x 0] [y 1]) (+ x y)))])
+      ,@(for/list ([t '(() 5 x (x y) (let ([x 0] [y 1]) (+ x y)) #f #t "hello")])
           (define test-message (format "smoke test ~a" t))
           (define cond
             `(call

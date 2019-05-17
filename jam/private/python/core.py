@@ -35,6 +35,8 @@ class W_Term(object):
     return False
   def is_cell(self):
     return False
+  def is_string(self):
+    return False
 
   to_string = subclass_responsibility0
 
@@ -60,6 +62,8 @@ class W_Term(object):
     return self.is_symbol() and s.equals_same(self)
   def equals_boolean(self, b):
     return self.is_boolean() and b.equals_same(self)
+  def equals_string(self, s):
+    return self.is_string() and s.equals_same(self)
 
   def int_value(self):
     bail("internal: Not an integer")
@@ -69,6 +73,8 @@ class W_Term(object):
     bail("internal: Not a boolean")
   def cell_value(self):
     bail("internal: Not a cell")
+  def string_value(self):
+    bail("internal: Not a string")
   def mutate_cell(self, v):
     bail("internal: Not a cell")
   def hd(self):
@@ -228,6 +234,10 @@ def integer_multiply0(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return v1.multiply(v2)
 
+def string_append(t):
+  [s1, s2] = [x for x in W_TermList(t)]
+  return s1.append(s2)
+
 class W_Boolean(W_Term):
   _immutable_fields_ = ['b']
   def __init__(self, b):
@@ -264,6 +274,39 @@ class W_Cell(W_Term):
 
   def mutate_cell(self, v):
     self.value = v
+
+class W_String(W_Term):
+  _immutable_fields_ = ['s']
+  def __init__(self, s):
+    W_Term.__init__(self)
+    self.s = s
+
+  def is_string(self):
+    return True
+  def atoms_equal(self, other):
+    return other.equals_string(self)
+  def equals_same(self, s):
+    return self.string_value() == s.string_value()
+  def string_value(self):
+    return self.s
+  def to_string(self):
+    return self.s
+
+  def append(self, other):
+    return W_String(self.s + other.string_value())
+
+def test_string():
+  s0 = make_string("fish")
+  s1 = make_string("chips")
+  x = make_integer(0)
+
+  assert not x.is_string()
+  assert s0.is_string()
+  assert s0.atoms_equal(s0)
+  assert s0.atoms_equal(make_string("fish"))
+
+  assert s0.append(s1).string_value() == "fishchips"
+  assert not s0.atoms_equal(s1)
 
 class W_TermList(W_Term):
   _immutable_fields_ = ['t']
@@ -339,6 +382,9 @@ def make_symbol(s):
 def make_integer(n):
   return W_Integer(n)
 
+def make_string(s):
+  return W_String(s)
+
 def make_boolean(b):
   return W_Boolean(b)
 
@@ -372,6 +418,9 @@ def is_symbol(t):
 
 def is_integer(t):
   return t.is_integer()
+
+def is_string(t):
+  return t.is_string()
 
 def is_boolean(t):
   return t.is_boolean()
@@ -524,6 +573,11 @@ def json_to_term(v):
     if not (tmp_i and tmp_i.is_int):
       bail("internal: integer json didn't contain an int")
     return make_integer(tmp_i.value_int())
+  if "string" in obj:
+    tmp_s = obj.get("string", None)
+    if not (tmp_s and tmp_s.is_string):
+      bail("internal: string json didn't contain a string")
+    return make_string(tmp_s.value_string())
   if "symbol" in obj:
     tmp_s = obj.get("symbol", None)
     if not(tmp_s and tmp_s.is_string):

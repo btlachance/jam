@@ -433,6 +433,10 @@
    (metafunction
     'clock-milliseconds
     (mf:data 'clock_milliseconds (pattern-of-ps '())))
+
+   (metafunction
+    'string-append
+    (mf:data 'string_append (pattern-of-ps (list string-pattern string-pattern))))
    ))
 
 (define (nonterminal-metafunctions nt-names nts rep)

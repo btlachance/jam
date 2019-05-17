@@ -12,6 +12,9 @@
          (hash 'integer n)
          (hash 'biginteger (number->string n)))]
 
+    [(? string? s)
+     (hash 'string s)]
+
     [(? symbol? s) (hash 'symbol (symbol->string s))]
 
     [(? boolean? b) (hash 'boolean b)]

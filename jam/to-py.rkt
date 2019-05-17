@@ -192,6 +192,7 @@
         'pair 'make_pair
         'symbol 'make_symbol
         'integer 'make_integer
+        'string 'make_string
         'boolean 'make_boolean
         'hd 'get_hd
         'tl 'get_tl
@@ -200,6 +201,7 @@
         'pair? 'is_pair
         'symbol? 'is_symbol
         'integer? 'is_integer
+        'string? 'is_string
         'boolean? 'is_boolean
         'list? 'is_list
         'print-term 'print_term
@@ -235,6 +237,7 @@
         'sequence_element_at 'sequence_element_at
         'sequence_set 'sequence_set
         'sequence_length 'sequence_length
+        'string_append 'string_append
         ))
 ;; A cheap way to test that this hash is partly consistent with
 ;; core.py is to generate a python module that tries to import all of

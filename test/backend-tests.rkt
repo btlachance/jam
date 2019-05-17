@@ -274,3 +274,11 @@
 
 (check-not-exn
  (lambda () (lang-modules env-lang #:main-evaluator 'eval)))
+
+(define str-lang (lang-info 'str
+                            '((s)) '((string))))
+(check-true (lang-metafunction-name? str-lang 'string-append))
+(lang-add-test-equal! str-lang
+                      '(string-append "hello" ", world") "hello, world")
+(lang-add-test-not-equal! str-lang
+                          "hello" "goodbye")

@@ -159,6 +159,7 @@
 ;; - `(pair? ,ir)
 ;; - `(symbol? ,ir)
 ;; - `(integer? ,ir)
+;; - `(string? ,ir)
 ;; - `(boolean? ,ir)
 ;; - `(list? ,ir)
 ;; - `(all? ,ir ,ir)

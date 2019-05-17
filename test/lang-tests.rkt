@@ -255,3 +255,15 @@
   (test-equal (ivec-length (ivec-of-elements)) 0)
   (test-equal (ivec-length (ivec-of-elements #t #f #t)) 3)
   (jam-test))
+
+(define-language str
+  (s ::= string))
+(define-metafunction str
+  [(str-test)
+   (string-append string_1 string_2)
+   (where (string_1 string_2) ("toast" "jam"))])
+(module+ test
+  (current-test-language str)
+  (test-equal (str-test) "toastjam")
+  (test-not-equal (str-test) "jamtoast")
+  (jam-test))
