@@ -267,3 +267,11 @@
   (test-equal (str-test) "toastjam")
   (test-not-equal (str-test) "jamtoast")
   (jam-test))
+
+(define-language file
+  #:data ([file (file)]))
+(module+ test
+  (current-test-language file)
+  (test-equal (file-write (file-stdout) "bread") ())
+  (test-equal (file-write (file-stderr) "butter") ())
+  (jam-test))

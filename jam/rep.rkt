@@ -5,6 +5,7 @@
  (struct-out nt:environment)
  (struct-out nt:mutable-sequence)
  (struct-out nt:immutable-sequence)
+ (struct-out nt:file)
 
  (struct-out metafunction)
  (struct-out mf:plain)
@@ -26,6 +27,7 @@
 (struct nt:environment (pred-py-name key-pattern value-pattern) #:transparent)
 (struct nt:mutable-sequence (pred-py-name element-pattern) #:transparent)
 (struct nt:immutable-sequence (pred-py-name element-pattern) #:transparent)
+(struct nt:file (pred-py-name) #:transparent)
 
 ;; a metafunction is a (metafunction symbol mf:rep)
 ;; a mf:rep is one of

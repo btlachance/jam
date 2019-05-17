@@ -2,6 +2,7 @@ import time
 import pytest
 from rpython.rlib import jit
 from rpython.rlib.objectmodel import we_are_translated, specialize
+from rpython.rlib import streamio as sio
 
 def bail(s):
   raise JamError(s)
@@ -924,6 +925,31 @@ def test_seq():
   assert immut3.element_at(2).int_value() == 7
   with pytest.raises(JamError):
     immut3.set(1, make_nil)
+
+def is_file(v):
+  return isinstance(v, W_File)
+
+class W_File(W_Term):
+  def __init__(self, file):
+    self.file = file
+  def write(self, string):
+    self.file.write(string)
+  def flush(self):
+    self.file.flush()
+
+stdout = W_File(sio.fdopen_as_stream(1, "w", buffering = 1))
+stderr = W_File(sio.fdopen_as_stream(2, "w", buffering = 1))
+
+def file_write(t):
+  [f, s] = [x for x in W_TermList(t)]
+  f.write(s.string_value())
+  return make_nil()
+def get_stdout(t):
+  [] = [x for x in W_TermList(t)]
+  return stdout
+def get_stderr(t):
+  [] = [x for x in W_TermList(t)]
+  return stderr
 
 if __name__ == "__test__":
   pytest.main([__file__, "-q"])

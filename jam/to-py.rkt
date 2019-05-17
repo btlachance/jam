@@ -90,7 +90,10 @@
                as e
                (do (app print ("Internal Error: %s" binop % e))
                    (app print ("Current term:\n%s" binop % (app (t dot to_toplevel_string))))
-                   (return ,none))))))]
+                   (return ,none)))
+              (finally
+               (do (app (,(ir->py-exp (module-var* 'core 'stdout)) dot flush))
+                   (app (,(ir->py-exp (module-var* 'core 'stderr)) dot flush)))))))]
 
      [ir (ir->py-stmt ir)]))
 
@@ -238,6 +241,12 @@
         'sequence_set 'sequence_set
         'sequence_length 'sequence_length
         'string_append 'string_append
+        'is_file 'is_file
+        'file_write 'file_write
+        'get_stdout 'get_stdout
+        'get_stderr 'get_stderr
+        'stdout 'stdout
+        'stderr 'stderr
         ))
 ;; A cheap way to test that this hash is partly consistent with
 ;; core.py is to generate a python module that tries to import all of

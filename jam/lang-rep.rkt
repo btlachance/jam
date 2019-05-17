@@ -56,7 +56,8 @@
 
 (define rep/c
   (rename-contract
-   (or/c nt:plain? nt:environment? nt:mutable-sequence? nt:immutable-sequence?)
+   (or/c nt:plain? nt:environment? nt:mutable-sequence? nt:immutable-sequence?
+         nt:file?)
    "a nonterminal rep"))
 
 (define (lang-grammar-module lang)
@@ -414,6 +415,7 @@
    'environment ((curry nt:environment) 'is_environment)
    'mutable-sequence ((curry nt:mutable-sequence) 'is_mutable_sequence)
    'immutable-sequence ((curry nt:immutable-sequence) 'is_immutable_sequence)
+   'file (lambda () (nt:file 'is_file))
    ))
 
 (define predefined-metafunctions
@@ -502,6 +504,18 @@
            (mf-name 'length)
            (mf:data 'sequence_length (pattern-of-ps (list nt))))))
 
+  (define (file-metafunctions nt-name nt)
+    (define (mf-name suffix) (format-symbol "~a-~a" nt-name suffix))
+    (list (metafunction
+           (mf-name 'write)
+           (mf:data 'file_write (pattern-of-ps (list nt string-pattern))))
+          (metafunction
+           (mf-name 'stdout)
+           (mf:data 'get_stdout (pattern-of-ps '())))
+          (metafunction
+           (mf-name 'stderr)
+           (mf:data 'get_stderr (pattern-of-ps '())))))
+
   (match rep
     [(nt:environment _ kp vp)
      (apply
@@ -522,4 +536,11 @@
       append
       (for/list ([nt-name nt-names]
                  [nt nts])
-        (immutable-sequence-metafunctions nt-name nt ep)))]))
+        (immutable-sequence-metafunctions nt-name nt ep)))]
+
+    [(nt:file _)
+     (apply
+      append
+      (for/list ([nt-name nt-names]
+                 [nt nts])
+        (file-metafunctions nt-name nt)))]))
