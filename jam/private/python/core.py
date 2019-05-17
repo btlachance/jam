@@ -1,3 +1,26 @@
+# Clunky, but this must come before other rlib imports so that the
+# loggers get patched before relevant instances are made
+import os
+import rpython.tool.ansi_print as ap
+if 'JAM_QUIET_RPYTHON' in os.environ:
+  if hasattr(ap, 'AnsiLog') and hasattr(ap, 'ansi_log'):
+    # Older versions of PyPy logged using the AnsiLog class and
+    # py.log, so we patch both of them (e.g. mandlebrot stuff would go
+    # through AnsiLog, and calling the platform compiler would go
+    # through py.log)
+    import py
+    class QuietAnsiLog(ap.AnsiLog):
+      def __init__(self, kw_to_color={}, file=None):
+        file = open(os.devnull, 'w')
+        ap.AnsiLog.__init__(self, kw_to_color=kw_to_color, file=file)
+        ap.ansi_log = QuietAnsiLog()
+        ap.AnsiLog = QuietAnsiLog
+
+    class QuietProducer(py.log.Producer):
+      def __call__(self, *args):
+        pass
+    py.log.Producer = QuietProducer
+
 import time
 import pytest
 from rpython.rlib import jit

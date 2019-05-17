@@ -5,6 +5,7 @@
  "lang-rep.rkt"
  "to-py.rkt"
  "term-to-json.rkt"
+ syntax/parse/define
  (for-syntax
   syntax/parse
   syntax/modresolve
@@ -197,8 +198,11 @@
             #:when (file-exists? py))
         (define out (open-output-string))
         (define successful-call
-          (parameterize ([current-output-port out])
-            (system* python py)))
+          (with-copied-environment-variables
+            (putenv "JAM_QUIET_RPYTHON" "")
+            (parameterize ([current-output-port out]
+                           [current-error-port out])
+              (system* python py))))
 
         (define printed (get-output-string out))
         (define success (and successful-call (not (regexp-match "failed" printed))))
@@ -284,6 +288,12 @@
                    lang-defining-path
                    'build #'translate? #t)]))
 
+(define-simple-macro (with-copied-environment-variables e ...)
+  (let ()
+    (define env (environment-variables-copy (current-environment-variables)))
+    (parameterize ([current-environment-variables env])
+      e ...)))
+
 (define (make-evaluator lang name destdir deps
                         #:translate? [translate? #t]
                         #:build? [build? #t])
@@ -291,15 +301,18 @@
     (if translate?
         (values (build-path destdir (~a name))
                 (lambda ()
-                  (putenv "JAM_BINARY_NAME" (~a name))
                   (define rpython (find-executable-path "rpython"))
-                  (system* rpython "-Ojit" "target.py"))
+                  (with-copied-environment-variables
+                    (putenv "JAM_BINARY_NAME" (~a name))
+                    (system* rpython "-Ojit" "target.py")))
                 (lambda () (system* target)))
         (values (build-path destdir "target.py")
                 void
                 (lambda ()
                   (define pypy (find-executable-path "pypy"))
-                  (system* pypy target)))))
+                  (with-copied-environment-variables
+                    (putenv "JAM_QUIET_RPYTHON" "")
+                    (system* pypy target))))))
 
   (when build?
     (parameterize ([make-print-checking #f])
@@ -313,9 +326,7 @@
              (define mods (lang-modules lang #:main-evaluator name))
              (write-modules mods destdir)
 
-             (define env (environment-variables-copy (current-environment-variables)))
-             (parameterize ([current-environment-variables env]
-                            [current-directory destdir])
+             (parameterize ([current-directory destdir])
                (in-modules-dir))))))))
   evaluator)
 
