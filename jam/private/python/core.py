@@ -956,6 +956,7 @@ def is_file(v):
 
 class W_File(W_Term):
   def __init__(self, file):
+    W_Term.__init__(self)
     self.file = file
   def write(self, string):
     self.file.write(string)
