@@ -22,8 +22,10 @@
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
              #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
+             #%vector?
              #%current-command-line-arguments
-             #%string-append)
+             #%string? #%string-append
+             #%raise) ;; XXX FYFF gives a semantics where raise isn't prim
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
@@ -60,14 +62,18 @@
                   cons   null   car   cdr   null?   pair?   list
                   apply   void   values   call-with-values
                   vector   vector-immutable   vector-ref   vector-length   vector-set!
+                  vector?
                   current-command-line-arguments
-                  string-append)
+                  string?   string-append
+                  raise)
                (#%+ #%- #%* #%zero?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
                 #%apply #%void #%values #%call-with-values
                 #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
+                #%vector?
                 #%current-command-line-arguments
-                #%string-append)))
+                #%string? #%string-append
+                #%raise)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -173,8 +179,23 @@
    #%void
    (where () (mvec-set mvec integer V))]
 
+  [(apply-op #%vector? (mvec))
+   #t]
+
+  [(apply-op #%vector? (ivec))
+   #t]
+
+  [(apply-op #%vector? (V))
+   #f]
+
   [(apply-op #%current-command-line-arguments ())
    (ivec-of-elements)]
+
+  [(apply-op #%string? (string))
+   #t]
+
+  [(apply-op #%string? (V))
+   #f]
 
   [(apply-op #%string-append ()) ""]
 
@@ -287,6 +308,9 @@
   [--> ((#%values V ...) (cwvk V_consumer k))
        (V_lastval (appk (env-empty) () (V ...) k))
        (where (V_lastval V ...) (reverse (V_consumer V ...)))]
+
+  [--> (V (appk _ () (#%raise) k))
+       (topk (env-empty) ())]
 
   [--> (V_0 (appk _ () (V ...) k))
        (V_result k)
@@ -534,7 +558,12 @@
                  (even? '10)))
               #t)
 
+  (test-equal (run-eval-e '"") "")
   (test-equal (run-eval-e '"hello") "hello")
+  (test-equal (run-eval-e (string? '"")) #t)
+  (test-equal (run-eval-e (string? '"cheese")) #t)
+  (test-equal (run-eval-e (string? '#t)) #f)
+  (test-equal (run-eval-e (string? '0)) #f)
 
   ;; XXX In the test form (string-append) parses as a metafunction
   ;; application, not as an object-language application expression. I
@@ -544,6 +573,16 @@
   ;; (test-equal (run-eval-e (string-append)) "")
 
   (test-equal (run-eval-e (vector-length (current-command-line-arguments))) 0)
+  (test-equal (run-eval-e (vector? (vector))) #t)
+  (test-equal (run-eval-e (vector? (vector-immutable))) #t)
+  (test-equal (run-eval-e (vector? '1)) #f)
+  (test-equal (run-eval-e (vector? '"hello")) #f)
+
+  (test-equal (run-eval
+               ('1
+                (raise '#f)
+                ((lambda (x) (x x)) (lambda (x) (x x)))))
+              ())
 
   (jam-test))
 
@@ -683,4 +722,3 @@
     (parameterize ([current-output-port out])
       (system* racket (quote-source-file) "--racket" p))
     (check-equal? (get-output-string out) "()\n")))
-
