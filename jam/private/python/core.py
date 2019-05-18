@@ -1,5 +1,6 @@
 # Clunky, but this must come before other rlib imports so that the
-# loggers get patched before relevant instances are made
+# loggers get patched before relevant instances are made; Only has an
+# effect when running the untranslated .py code with python/pypy
 import os
 import rpython.tool.ansi_print as ap
 if 'JAM_QUIET_RPYTHON' in os.environ:
@@ -25,7 +26,6 @@ import time
 import pytest
 from rpython.rlib import jit
 from rpython.rlib.objectmodel import we_are_translated, specialize
-from rpython.rlib import streamio as sio
 
 def bail(s):
   raise JamError(s)
@@ -962,17 +962,25 @@ class W_File(W_Term):
   def flush(self):
     self.file.flush()
 
-stdout = W_File(sio.fdopen_as_stream(1, "w", buffering = 1))
-stderr = W_File(sio.fdopen_as_stream(2, "w", buffering = 1))
+stdout = None
+stderr = None
 
 def file_write(t):
   [f, s] = [x for x in W_TermList(t)]
   f.write(s.string_value())
   return make_nil()
 def get_stdout(t):
+  if stdout is None:
+    from rpython.rlib import streamio as sio
+    stdout = W_File(sio.fdopen_as_stream(1, "w", buffering = 1))
+
   [] = [x for x in W_TermList(t)]
   return stdout
 def get_stderr(t):
+  if stderr is None:
+    from rpython.rlib import streamio as sio
+    stderr = W_File(sio.fdopen_as_stream(2, "w", buffering = 1))
+
   [] = [x for x in W_TermList(t)]
   return stderr
 

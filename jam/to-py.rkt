@@ -92,8 +92,10 @@
                    (app print ("Current term:\n%s" binop % (app (t dot to_toplevel_string))))
                    (return ,none)))
               (finally
-               (do (app (,(ir->py-exp (module-var* 'core 'stdout)) dot flush))
-                   (app (,(ir->py-exp (module-var* 'core 'stderr)) dot flush)))))))]
+               (do (if ,(ir->py-exp (module-var* 'core 'stdout))
+                       (app (,(ir->py-exp (module-var* 'core 'stdout)) dot flush)))
+                   (if ,(ir->py-exp (module-var* 'core 'stderr))
+                       (app (,(ir->py-exp (module-var* 'core 'stderr)) dot flush))))))))]
 
      [ir (ir->py-stmt ir)]))
 
