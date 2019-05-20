@@ -971,6 +971,7 @@ def file_write(t):
   f.write(s.string_value())
   return make_nil()
 def get_stdout(t):
+  global stdout
   if stdout is None:
     from rpython.rlib import streamio as sio
     stdout = W_File(sio.fdopen_as_stream(1, "w", buffering = 1))
@@ -978,6 +979,7 @@ def get_stdout(t):
   [] = [x for x in W_TermList(t)]
   return stdout
 def get_stderr(t):
+  global stderr
   if stderr is None:
     from rpython.rlib import streamio as sio
     stderr = W_File(sio.fdopen_as_stream(2, "w", buffering = 1))
