@@ -320,7 +320,9 @@ class W_String(W_Term):
   def to_string(self):
     return self.s
   def to_toplevel_string(self):
-    return repr(self.s)
+    # HT Pycket
+    from pypy.objspace.std.bytesobject import string_escape_encode
+    return string_escape_encode(self.s, '"')
 
   def append(self, other):
     return W_String(self.s + other.string_value())
@@ -962,39 +964,51 @@ def is_file(v):
   return isinstance(v, W_File)
 
 class W_File(W_Term):
-  def __init__(self, file):
-    W_Term.__init__(self)
-    self.file = file
-  def atoms_equal(self, other):
-    return False
   def write(self, string):
     self.file.write(string)
+  def atoms_equal(self, other):
+    return False
   def flush(self):
     self.file.flush()
   def to_string(self):
     return "#%file"
 
-stdout = None
-stderr = None
+class W_StrictFile(W_Term):
+  def __init__(self, file):
+    W_File.__init__(self)
+    self.file = file
+
+class W_LazyFile(W_File):
+  def __init__(self, thunk):
+    W_File.__init__(self)
+    self.thunk = thunk
+    self.file = None
+  def write(self, string):
+    if self.file is None:
+      self.file = self.thunk()
+    W_File.write(self, string)
+  def flush(self):
+    if self.file is None:
+      self.file = self.thunk()
+    W_File.flush(self)
+
+def get_stdout():
+  from rpython.rlib import streamio as sio
+  return sio.fdopen_as_stream(1, "w", buffering = 1)
+def get_stderr():
+  from rpython.rlib import streamio as sio
+  return sio.fdopen_as_stream(2, "w", buffering = 1)
+stdout = W_LazyFile(get_stdout)
+stderr = W_LazyFile(get_stderr)
 
 def file_write(t):
   [f, s] = [x for x in W_TermList(t)]
   f.write(s.string_value())
   return make_nil()
 def get_stdout(t):
-  global stdout
-  if stdout is None:
-    from rpython.rlib import streamio as sio
-    stdout = W_File(sio.fdopen_as_stream(1, "w", buffering = 1))
-
   [] = [x for x in W_TermList(t)]
   return stdout
 def get_stderr(t):
-  global stderr
-  if stderr is None:
-    from rpython.rlib import streamio as sio
-    stderr = W_File(sio.fdopen_as_stream(2, "w", buffering = 1))
-
   [] = [x for x in W_TermList(t)]
   return stderr
 
