@@ -318,9 +318,9 @@ class W_String(W_Term):
   def string_value(self):
     return self.s
   def to_string(self):
-    return '"%s"' % self.s
+    return self.s
   def to_toplevel_string(self):
-    return '"%s"' % self.s
+    return repr(self.s)
 
   def append(self, other):
     return W_String(self.s + other.string_value())
@@ -965,10 +965,14 @@ class W_File(W_Term):
   def __init__(self, file):
     W_Term.__init__(self)
     self.file = file
+  def atoms_equal(self, other):
+    return False
   def write(self, string):
     self.file.write(string)
   def flush(self):
     self.file.flush()
+  def to_string(self):
+    return "#%file"
 
 stdout = None
 stderr = None
