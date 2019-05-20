@@ -39,7 +39,7 @@ def subclass_responsibility1(self, v):
   bail("internal: Subclass responsibility")
 
 @specialize.call_location()
-def subclass_responsibility2(self, v):
+def subclass_responsibility2(self, v, w):
   bail("internal: Subclass responsibility")
 
 class W_Term(object):
