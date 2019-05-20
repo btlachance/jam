@@ -5,7 +5,8 @@
 (define-language pl
   #:data ([env (environment x V)]
           [mvec (mutable-sequence V)]
-          [ivec (immutable-sequence V)])
+          [ivec (immutable-sequence V)]
+          [file (file)])
 
   (P     ::= (t ...))
   (t     ::= e (define-values (x ...) e))
@@ -17,7 +18,7 @@
   (x y z ::= variable-not-otherwise-mentioned)
   (c     ::= integer boolean string)
 
-  (V     ::= {env l} c mvec ivec
+  (V     ::= {env l} c mvec ivec file
              #%+ #%- #%* #%zero?
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
@@ -25,7 +26,8 @@
              #%vector?
              #%current-command-line-arguments
              #%string? #%string-append
-             #%raise) ;; XXX FYFF gives a semantics where raise isn't prim
+             #%raise ;; XXX FYFF gives a semantics where raise isn't prim
+             #%write-string #%current-output-port #%current-error-port)
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
@@ -65,7 +67,8 @@
                   vector?
                   current-command-line-arguments
                   string?   string-append
-                  raise)
+                  raise
+                  write-string   current-output-port   current-error-port)
                (#%+ #%- #%* #%zero?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
                 #%apply #%void #%values #%call-with-values
@@ -73,7 +76,8 @@
                 #%vector?
                 #%current-command-line-arguments
                 #%string? #%string-append
-                #%raise)))
+                #%raise
+                #%write-string #%current-output-port #%current-error-port)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -200,8 +204,20 @@
   [(apply-op #%string-append ()) ""]
 
   [(apply-op #%string-append (string_0 string ...))
-   (string-append string_0 (apply-op #%string-append (string ...)))])
+   (string-append string_0 (apply-op #%string-append (string ...)))]
 
+  [(apply-op #%current-output-port ())
+   (file-stdout)]
+
+  [(apply-op #%current-error-port ())
+   (file-stderr)]
+
+  [(apply-op #%write-string (string file))
+   (string-length string)
+   (where () (file-write file string))]
+
+  [(apply-op #%write-string (string))
+   (apply-op #%write-string (string (file-stdout)))])
 
 (define-metafunction pl
   [(prefix-and-rest () (V_rest ...))
@@ -669,9 +685,12 @@
 (define (form->pycketlite f)
   (syntax-parse f
     #:literal-sets (kernel-literals)
-    #:datum-literals (call-with-values)
+    #:datum-literals (call-with-values print-values)
     [(#%plain-app call-with-values (lambda () e) print-values)
      (expr->pycketlite #'e)]
+
+    [(#%plain-app e0 e ...)
+     (expr->pycketlite this-syntax)]
 
     [(define-values (x ...) e)
      `(define-values ,(map syntax-e (attribute x)) ,(expr->pycketlite #'e))]))
@@ -712,6 +731,20 @@
   (require syntax/location rackunit)
   (define racket (find-executable-path "racket"))
 
+  (define (get-expect p)
+    (define source (open-input-file p))
+    (define expect/default "()\n")
+    (define expect
+      (match (read-string 2 source)
+        [(or "#;" ";;")
+         (match (read source)
+           [(regexp #rx"testout:(.*)" (list _ expect)) expect]
+           [_ expect/default])]
+        [_ expect/default]))
+
+    (close-input-port source)
+    expect)
+
   (match-define-values (base _ _) (split-path (quote-source-file)))
   (parameterize ([current-output-port (open-output-nowhere)])
     (void (system* racket (quote-source-file) "--build")))
@@ -719,6 +752,8 @@
         #:when (path-has-extension? p ".rkt")
         #:unless (equal? (path->string (file-name-from-path p)) "info.rkt"))
     (define out (open-output-string))
-    (parameterize ([current-output-port out])
+    (parameterize ([current-output-port out]
+                   [current-error-port out])
       (system* racket (quote-source-file) "--racket" p))
-    (check-equal? (get-output-string out) "()\n")))
+
+    (check-equal? (get-output-string out) (get-expect p))))
