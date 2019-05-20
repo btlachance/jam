@@ -266,6 +266,9 @@
   (current-test-language str)
   (test-equal (str-test) "toastjam")
   (test-not-equal (str-test) "jamtoast")
+  (test-equal (string-length "") 0)
+  (test-equal (string-length "fish") 4)
+  (test-not-equal (string-length "chips") 0)
   (jam-test))
 
 (define-language file

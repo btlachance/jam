@@ -439,6 +439,9 @@
    (metafunction
     'string-append
     (mf:data 'string_append (pattern-of-ps (list string-pattern string-pattern))))
+   (metafunction
+    'string-length
+    (mf:data 'string_length (pattern-of-ps (list string-pattern))))
    ))
 
 (define (nonterminal-metafunctions nt-names nts rep)

@@ -262,6 +262,10 @@ def string_append(t):
   [s1, s2] = [x for x in W_TermList(t)]
   return s1.append(s2)
 
+def string_length(t):
+  [s] = [x for x in W_TermList(t)]
+  return make_integer(s.length())
+
 class W_Boolean(W_Term):
   _immutable_fields_ = ['b']
   def __init__(self, b):
@@ -320,6 +324,9 @@ class W_String(W_Term):
 
   def append(self, other):
     return W_String(self.s + other.string_value())
+
+  def length(self):
+    return len(self.s)
 
 def test_string():
   s0 = make_string("fish")
