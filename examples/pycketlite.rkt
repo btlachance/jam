@@ -1,5 +1,5 @@
 #lang racket
-(require jam)
+(require "pycketlite-util.rkt" jam)
 (provide pl)
 
 (define-language pl
@@ -365,6 +365,22 @@
   [--> (V (ifk env e_then _ k))
        (e_then env k)])
 
+(require
+ syntax/parse/define
+ (for-syntax
+  syntax/location
+  "pycketlite-util.rkt"))
+(define-simple-macro (mk/predefined metafun:id)
+  #:do [(define predefined.rkt
+          (build-path (syntax-source-directory #'here)
+                      "racket"
+                      "predefined.rkt"))]
+  #:with p (path->pycketlite predefined.rkt #f)
+  (define-metafunction pl
+    [(metafun)
+     p]))
+(mk/predefined predefined)
+
 (define-evaluator pl
   eval
 
@@ -658,74 +674,13 @@
              #:translate? translate?
              #:prompt? #f))))]
     [(? path-string? p)
-     (parameterize ([read-accept-reader #t]
-                    [read-accept-lang #t]
-                    [current-namespace (make-base-namespace)]
-                    [current-input-port (open-input-file p)])
-       (define stx (read-syntax))
-       (begin0 (unless (eof-object? stx)
-                 (define p (module->pycketlite (expand stx)))
-                 (parameterize ([current-input-port (open-input-string (~s p))])
-                   (jam-run pl eval
-                     #:path dest
-                     #:translate? translate?
-                     #:prompt? #f)))
-         (close-input-port (current-input-port))))]
+     (define forms (path->pycketlite p))
+     (parameterize ([current-input-port (open-input-string (~s forms))])
+       (jam-run pl eval
+         #:path dest
+         #:translate? translate?
+         #:prompt? #f))]
     [#f (void)]))
-
-(require syntax/parse)
-(define (module->pycketlite stx)
-  (syntax-parse stx
-    #:literal-sets (kernel-literals)
-    [(module name lang
-       (#%module-begin mod-config
-                       forms ...))
-     (map form->pycketlite (attribute forms))]))
-
-(define (form->pycketlite f)
-  (syntax-parse f
-    #:literal-sets (kernel-literals)
-    #:datum-literals (call-with-values print-values)
-    [(#%plain-app call-with-values (lambda () e) print-values)
-     (expr->pycketlite #'e)]
-
-    [(#%plain-app e0 e ...)
-     (expr->pycketlite this-syntax)]
-
-    [(define-values (x ...) e)
-     `(define-values ,(map syntax-e (attribute x)) ,(expr->pycketlite #'e))]))
-
-(define (expr->pycketlite e)
-  (syntax-parse e
-    #:literal-sets (kernel-literals)
-    [(#%plain-lambda (x ...) e)
-     `(lambda ,(map syntax-e (attribute x)) ,(expr->pycketlite #'e))]
-
-    [(#%plain-lambda x:id e)
-     `(lambda ,(syntax-e #'x) ,(expr->pycketlite #'e))]
-
-    [(#%plain-lambda (x ... . y) e)
-     `(lambda ,(map syntax-e (attribute x)) (dot ,(syntax-e #'y))
-              ,(expr->pycketlite #'e))]
-
-    [(if e1 e2 e3)
-     `(if ,(expr->pycketlite #'e1)
-          ,(expr->pycketlite #'e2)
-          ,(expr->pycketlite #'e3))]
-
-    [((~and form (~or let-values letrec-values)) ([(x ...) e] ...) e_body)
-     (let ([x* (syntax->datum #'((x ...) ...))]
-           [e* (map expr->pycketlite (attribute e))])
-       `(,(syntax-e #'form) ,(map list x* e*)
-          ,(expr->pycketlite #'e_body)))]
-
-    [(quote {~or :exact-integer :boolean :string})
-     (syntax->datum this-syntax)]
-
-    [(#%plain-app e e* ...)
-     (cons (expr->pycketlite #'e) (map expr->pycketlite (attribute e*)))]
-
-    [x:id (syntax-e #'x)]))
 
 (module+ test
   (require syntax/location rackunit)
@@ -748,7 +703,7 @@
     (close-input-port source)
     expect)
 
-  (match-define-values (base _ _) (split-path (quote-source-file)))
+  (define base (syntax-source-directory #'here))
   (parameterize ([current-output-port (open-output-nowhere)])
     (void (system* racket (quote-source-file) "--build")))
   (for ([p (directory-list (build-path base "racket") #:build? #t)]
