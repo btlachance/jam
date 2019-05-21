@@ -1,4 +1,4 @@
-#;"testout:hello\nbutter\npeanut\n()\n"
+#;(testout "hello\nbutter\npeanut\n()\n")
 #lang racket
 (void
  (write-string "hello\n")

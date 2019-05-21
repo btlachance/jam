@@ -736,11 +736,14 @@
     (define expect/default "()\n")
     (define expect
       (match (read-string 2 source)
-        [(or "#;" ";;")
+        ["#;" ;quote-terminated comment for racket-mode highlighting"
          (match (read source)
-           [(regexp #rx"testout:(.*)" (list _ expect)) expect]
-           [_ expect/default])]
-        [_ expect/default]))
+           [`(testout ,(? string? expect)) expect]
+           [d
+            (eprintf "unexpected datum in file ~a; got ~s\n" p d)
+            expect/default])]
+        [_
+         expect/default]))
 
     (close-input-port source)
     expect)
