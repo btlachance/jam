@@ -376,6 +376,9 @@
                       "racket"
                       "predefined.rkt"))]
   #:with p (path->pycketlite predefined.rkt #f)
+  ;; XXX This is dicey: things like string-append that occur in
+  ;; predefined.rkt will parse as calls to the metafunction
+  ;; string-append and not as object-level function applications
   (define-metafunction pl
     [(metafun)
      p]))
