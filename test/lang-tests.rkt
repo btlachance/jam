@@ -278,3 +278,34 @@
   (test-equal (file-write (file-stdout) "bread") ())
   (test-equal (file-write (file-stderr) "butter") ())
   (jam-test))
+
+(define-language under
+  (e ::= x (lambda (x) _) (_ _))
+  (x ::= variable-not-otherwise-mentioned))
+(module+ test
+  (current-test-language under))
+
+(define-metafunction under
+  [(append () ((name ys _) ...))
+   (ys ...)]
+  [(append ((name x _) (name xs _) ...) ((name ys _) ...))
+   (x zs ...)
+   (where ((name zs _) ...) (append (xs ...) (ys ...)))])
+
+(module+ test
+  (test-equal (append () ()) ())
+  (test-equal (append (1 #t 3) (4 #f 6)) (1 #t 3 4 #f 6)))
+
+(define-metafunction under
+  [(vars-of x) (x)]
+  [(vars-of (lambda (x) e)) (vars-of e)]
+  [(vars-of (e_1 e_2))
+   (append (x_1 ...) (x_2 ...))
+   (where (x_1 ...) (vars-of e_1))
+   (where (x_2 ...) (vars-of e_2))])
+
+(module+ test
+  (test-equal (vars-of x) (x))
+  (test-equal (vars-of (lambda (y) x)) (x))
+  (test-equal (vars-of ((x y) x)) (x y x))
+  (jam-test))
