@@ -641,20 +641,19 @@ def is_list(t):
   if t.is_nil():
     return True
   if t.is_pair():
-    t = t.tl()
-    while t.is_pair():
-      t = t.tl()
-    return t.is_nil()
+    return True
   return False
 
 def print_term(t):
   print t.to_toplevel_string()
 
 def all_terms(pred, terms):
-  for term in W_TermList(terms):
-    if not pred(term):
-      return False
-  return True
+  if terms.is_nil():
+    return True
+  if terms.is_pair():
+    hd = terms.hd()
+    return pred(hd)
+  return False
 
 @jit.unroll_safe
 def map_terms(f, terms):
@@ -725,6 +724,7 @@ def test_decompose_values():
 
 
 # INV: levels contains at least one non-atomic level
+@jit.unroll_safe
 def equal_lengths(levels, terms):
   length = -1
   for level, term in izip2(levels, terms):
@@ -744,6 +744,7 @@ def test_equal_lengths():
   levels = [0, 1]
   assert equal_lengths(levels, terms)
 
+@jit.unroll_safe
 def stop_now(levels, terms):
   for level, term in izip2(levels, terms):
     if level == 0:

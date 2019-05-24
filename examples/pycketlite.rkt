@@ -4,22 +4,22 @@
 
 (define-language pl
   #:data ([env (environment x loc)]
-          [store (store loc V)]
+          [store (store loc _)]
           [loc (location)]
-          [mvec (mutable-sequence V)]
-          [ivec (immutable-sequence V)]
+          [mvec (mutable-sequence _)]
+          [ivec (immutable-sequence _)]
           [file (file)])
 
   (P     ::= (t ...))
   (t     ::= e (define-values (x ...) e))
-  (e     ::= x l (quote c) (e e ...) (if e e e)
-             (let-values ([(x ...) e] ...) e e ...)
-             (letrec-values ([(x ...) e] ...) e e ...)
-             (begin e e ...)
-             (set! x e))
-  (l     ::= (lambda (x ...) e e ...)
-             (lambda x e e ...)
-             (lambda (x ...) (dot x) e e ...))
+  (e     ::= x l (quote c) (e e ...) (if _ _ _)
+             (let-values ([(x ...) _] ...) _ _ ...)
+             (letrec-values ([(x ...) _] ...) _ _ ...)
+             (begin _ _ ...)
+             (set! x _))
+  (l     ::= (lambda (x ...) _ _ ...)
+             (lambda x _ _ ...)
+             (lambda (x ...) (dot x) _ _ ...))
 
   (x y z ::= variable-not-otherwise-mentioned)
   (c     ::= integer real boolean string (#%s string))
@@ -40,11 +40,11 @@
   ;; complexity) and have certain expressions evaluate to locations
   ;; and others evaluate just to their value.
 
-  (V     ::= {env l} c mvec ivec file (cont k)
+  (V     ::= {env l} c mvec ivec file (cont _)
              #%+ #%- #%* #%/ #%zero? #%exact-integer? #%inexact? #%= #%<
              #%inexact->exact #%exact->inexact #%number?
              #%sin #%quotient #%remainder
-             (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
+             (#%cons _ _) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
              #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
              #%vector?
@@ -59,13 +59,12 @@
              #%call-with-current-continuation)
 
   (k     ::= k1 k*)
-  (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k) (setk x env k))
-
+  (k1    ::= (appk env (e ...) (V ...) _) (ifk env e e _) (setk x env _))
   ;; It's a little funky that we keep the store also in topk but it's
   ;; an artifact of how we initialize the machine. An alternative
   ;; would be an initial state like (store env (topk P)). Which gives
   ;; me an idea that defk could be changed to (defk (x ...) P)
-  (k*    ::= (topk env store P) (defk (x ...) env P) (cwvk V k)
+  (k*    ::= (topk env store P) (defk (x ...) env P) (cwvk V _)
 
              ;; env               environment for remaining RHS
              ;; (x ...)           variables the current RHS results will be bound to
@@ -77,15 +76,16 @@
              ;; lists instead of one zipped one if we had an explicit
              ;; way to check that #values returned to the continuation
              ;; matched #variables for the current RHS)
-             (letk env (x ...) ([(x ...) e] ...) ((x V) ...) (e e ...) k)
+             (letk env (x ...) ([(x ...) e] ...) ((x V) ...) (e e ...) _)
 
              ;; Like letk but RHS and the body are evaluated in the
              ;; same environment, and values are set in that
              ;; environment once they're available, so no need for a
              ;; separate list of variables/values so far
-             (letreck env (x ...) ([(x ...) e] ...) (e e ...) k)
+             (letreck env (x ...) ([(x ...) e] ...) (e e ...) _)
 
-             (begink env (e e ...) k)))
+             (begink env (e e ...) _)))
+
 (module+ test
   (current-test-language pl))
 
