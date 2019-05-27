@@ -72,3 +72,10 @@
                  [current-input-port (open-input-file p)])
     (begin0 (module->pycketlite (expand (read-syntax)))
       (close-input-port (current-input-port)))))
+
+(module+ main
+  (require jam/term-to-json json)
+  (command-line
+   #:args (path)
+   (void (write-json (term-to-json (path->pycketlite path))))))
+

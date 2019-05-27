@@ -107,13 +107,20 @@
    (any_first appended ...)
    (where ((name appended _) ...) (append (any_rest ...) (any ...)))])
 
+(define-metafunction pl
+  [(load-pl string_path)
+   P
+   (where P (system*/json-term "/usr/bin/env" "racket" "/Users/blachance/projects/jam/examples/pycketlite-util.rkt" string_path))])
+
 (module+ test
   (test-equal (flatten-vars ((x y))) (x y))
   (test-equal (flatten-vars ((x y) () (z))) (x y z))
 
   (test-equal (append () (#t)) (#t))
   (test-equal (append (1 2 3) (#t #f #t)) (1 2 3 #t #f #t))
-  (test-equal (append (1 #t 2) ()) (1 #t 2)))
+  (test-equal (append (1 #t 2) ()) (1 #t 2))
+
+  (test-not-equal (load-pl "/Users/blachance/projects/jam/examples/racket/predefined.rkt") ()))
 
 (define-metafunction pl
   [(apply-op #%+ (integer_1 integer_2))
@@ -368,7 +375,9 @@
 (define-evaluator pl
   eval
 
-  #:load [--> P (topk (init-env (toplevel-names P)) P)]
+  #:load [--> P_user (topk (init-env (toplevel-names P)) P)
+              (where P_predef (load-pl "/Users/blachance/projects/jam/examples/racket/predefined.rkt"))
+              (where P (append P_predef P_user))]
 
   #:unload [--> (topk _ ()) ()] ;; XXX maybe call an exit metafunction
                                 ;; here, indicating a succesful
@@ -692,7 +701,8 @@
     (void (system* racket (quote-source-file) "--build")))
   (for ([p (directory-list (build-path base "racket") #:build? #t)]
         #:when (path-has-extension? p ".rkt")
-        #:unless (equal? (path->string (file-name-from-path p)) "info.rkt"))
+        #:unless (member (path->string (file-name-from-path p))
+                         '("info.rkt" "predefined.rkt")))
     (define out (open-output-string))
     (parameterize ([current-output-port out]
                    [current-error-port out])
