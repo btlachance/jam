@@ -1,5 +1,5 @@
 #lang racket
-(require "pycketlite-util.rkt" jam)
+(require jam)
 (provide pl)
 
 (define-language pl
@@ -365,25 +365,6 @@
   [--> (V (ifk env e_then _ k))
        (e_then env k)])
 
-(require
- syntax/parse/define
- (for-syntax
-  syntax/location
-  "pycketlite-util.rkt"))
-(define-simple-macro (mk/predefined metafun:id)
-  #:do [(define predefined.rkt
-          (build-path (syntax-source-directory #'here)
-                      "racket"
-                      "predefined.rkt"))]
-  #:with p (path->pycketlite predefined.rkt #f)
-  ;; XXX This is dicey: things like string-append that occur in
-  ;; predefined.rkt will parse as calls to the metafunction
-  ;; string-append and not as object-level function applications
-  (define-metafunction pl
-    [(metafun)
-     p]))
-(mk/predefined predefined)
-
 (define-evaluator pl
   eval
 
@@ -622,7 +603,7 @@
   (jam-test))
 
 (module+ main
-  (require syntax/location)
+  (require syntax/location "pycketlite-util.rkt")
   (define dest (build-path (syntax-source-directory #'here) "pycketlite"))
   (define interpreter-mode (make-parameter 'plain))
   (define run (make-parameter #f))
