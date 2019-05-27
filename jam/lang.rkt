@@ -154,7 +154,7 @@
                                (attribute load.wheres))]
                    [unload (list (attribute unload.arg)
                                  (attribute unload.rhs)
-                                 (attribute load.wheres))]
+                                 (attribute unload.wheres))]
                    [cs (list (attribute cs.arg)
                              (attribute cs.rhs)
                              (attribute cs.wheres))])
