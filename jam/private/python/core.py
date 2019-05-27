@@ -320,9 +320,12 @@ class W_String(W_Term):
   def to_string(self):
     return self.s
   def to_toplevel_string(self):
-    # HT Pycket
-    from pypy.objspace.std.bytesobject import string_escape_encode
-    return string_escape_encode(self.s, '"')
+    if we_are_translated():
+      # HT Pycket
+      from pypy.objspace.std.bytesobject import string_escape_encode
+      return string_escape_encode(self.s, '"')
+    else:
+      return '"%s"' % self.s.encode('string_escape')
 
   def append(self, other):
     return W_String(self.s + other.string_value())
