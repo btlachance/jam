@@ -309,3 +309,11 @@
   (test-equal (vars-of (lambda (y) x)) (x))
   (test-equal (vars-of ((x y) x)) (x y x))
   (jam-test))
+
+(module+ test
+  (test-equal (system*/json-term "/bin/echo" "{\"integer\": 1}") 1)
+  (test-equal (system*/json-term "/bin/echo" "{\"string\": \"sslothh\"}")
+              "sslothh")
+  (test-equal (system*/json-term "/bin/echo" "{\"boolean\": false}")
+              #f)
+  (jam-test))

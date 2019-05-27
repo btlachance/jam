@@ -442,6 +442,10 @@
    (metafunction
     'string-length
     (mf:data 'string_length (pattern-of-ps (list string-pattern))))
+
+   (metafunction
+    'system*/json-term
+    (mf:data 'systemstar_json_term (repeat-pattern string-pattern)))
    ))
 
 (define (nonterminal-metafunctions nt-names nts rep)

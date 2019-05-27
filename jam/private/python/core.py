@@ -1,7 +1,7 @@
 # Clunky, but this must come before other rlib imports so that the
 # loggers get patched before relevant instances are made; Only has an
 # effect when running the untranslated .py code with python/pypy
-import os
+import os, subprocess
 import rpython.tool.ansi_print as ap
 if 'JAM_QUIET_RPYTHON' in os.environ:
   if hasattr(ap, 'AnsiLog') and hasattr(ap, 'ansi_log'):
@@ -1011,6 +1011,10 @@ def get_stdout(t):
 def get_stderr(t):
   [] = [x for x in W_TermList(t)]
   return stderr
+
+def systemstar_json_term(t):
+  args = [x.string_value() for x in W_TermList(t)]
+  return string_to_term(subprocess.check_output(args))
 
 if __name__ == "__test__":
   pytest.main([__file__, "-q"])

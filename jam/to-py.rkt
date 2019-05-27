@@ -180,6 +180,7 @@
     (regexp-replaces (symbol->string name)
                      '((#rx"-"  "_")
                        (#rx"\\?$" "")
+                       (#rx"/" "")
                        (#rx"\\*" "star"))))
 
   (match (sequence->list (generate-tokens (open-input-string result)))
@@ -250,6 +251,7 @@
         'get_stderr 'get_stderr
         'stdout 'stdout
         'stderr 'stderr
+        'systemstar_json_term 'systemstar_json_term
         ))
 ;; A cheap way to test that this hash is partly consistent with
 ;; core.py is to generate a python module that tries to import all of
