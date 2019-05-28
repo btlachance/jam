@@ -19,7 +19,7 @@
   (c     ::= integer real boolean string)
 
   (V     ::= {env l} c mvec ivec file
-             #%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%=
+             #%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%= #%<
              #%inexact->exact #%exact->inexact #%number?
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
@@ -63,7 +63,7 @@
    (where env (env-empty))
    (where env (env-extend
                env
-               (  +   -   *   zero?   exact-integer?   inexact?   =
+               (  +   -   *   zero?   exact-integer?   inexact?   =   <
                   inexact->exact   exact->inexact   number?
                   cons   null   car   cdr   null?   pair?   list
                   apply   void   values   call-with-values
@@ -75,7 +75,7 @@
                   raise
                   write-string   current-output-port   current-error-port
                   current-inexact-milliseconds)
-               (#%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%=
+               (#%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%= #%<
                 #%inexact->exact #%exact->inexact #%number?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
                 #%apply #%void #%values #%call-with-values
@@ -200,6 +200,18 @@
 
   [(apply-op #%= (real integer))
    (apply-op #%= ((real->integer real) integer))]
+
+  [(apply-op #%< (integer_1 integer_2))
+   (integer-< integer_1 integer_2)]
+
+  [(apply-op #%< (real_1 real_2))
+   (real-< real_1 real_2)]
+
+  [(apply-op #%< (integer real))
+   (real-< (integer->real integer) real)]
+
+  [(apply-op #%< (real integer))
+   (real-< real (integer->real integer))]
 
   [(apply-op #%exact->inexact (integer))
    (integer->real integer)]
