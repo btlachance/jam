@@ -1,7 +1,7 @@
 # Clunky, but this must come before other rlib imports so that the
 # loggers get patched before relevant instances are made; Only has an
 # effect when running the untranslated .py code with python/pypy
-import os, subprocess
+import os
 import rpython.tool.ansi_print as ap
 if 'JAM_QUIET_RPYTHON' in os.environ:
   if hasattr(ap, 'AnsiLog') and hasattr(ap, 'ansi_log'):
@@ -727,15 +727,14 @@ def json_to_term(v):
     return make_boolean(tmp_b.tostring() == "true")
   bail("internal: couldn't make a term from json")
 
-if we_are_translated():
-  from pycket import pycket_json
-  def string_to_term(s):
+def string_to_term(s):
+  if we_are_translated():
+    from pycket import pycket_json
     json = pycket_json.loads(s)
     return json_to_term(json)
-else:
-  import json
-  import pycket_json_adapter as pja
-  def string_to_term(s):
+  else:
+    import json
+    import pycket_json_adapter as pja
     adapted = pja.adapt(json.loads(s))
     return json_to_term(adapted)
 
@@ -1101,9 +1100,23 @@ def get_stderr(t):
   [] = [x for x in W_TermList(t)]
   return stderr
 
+# https://stackoverflow.com/a/35857/168645
+def shellquote(s):
+  # Originally, this function was just
+  #   return "'" + s.replace("'", "'\\''") + "'"
+  # But RPython s.replace only works when the replacement is a char
+  # and I think what's below is equivalent
+
+  replaced = "'\\''".join(s.split("'"))
+  return "'" + replaced + "'"
+
 def systemstar_json_term(t):
-  args = [x.string_value() for x in W_TermList(t)]
-  return string_to_term(subprocess.check_output(args))
+  from rpython.rlib import rfile
+  args = [shellquote(x.string_value()) for x in W_TermList(t)]
+  f = rfile.create_popen_file(' '.join(args), 'r')
+  s = f.read()
+  f.close()
+  return string_to_term(s)
 
 if __name__ == "__test__":
   pytest.main([__file__, "-q"])
