@@ -16,15 +16,16 @@
   (l     ::= (lambda (x ...) e) (lambda x e) (lambda (x ...) (dot x) e))
 
   (x y z ::= variable-not-otherwise-mentioned)
-  (c     ::= integer boolean string)
+  (c     ::= integer real boolean string)
 
   (V     ::= {env l} c mvec ivec file
-             #%+ #%- #%* #%zero?
+             #%+ #%- #%* #%zero? #%exact-integer? #%inexact?
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
              #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
              #%vector?
              #%current-command-line-arguments
+             #%boolean?
              #%string? #%string-append
              #%raise ;; XXX FYFF gives a semantics where raise isn't prim
              #%write-string #%current-output-port #%current-error-port)
@@ -60,21 +61,23 @@
    (where env (env-empty))
    (where env (env-extend
                env
-               (  +   -   *   zero?
+               (  +   -   *   zero?   exact-integer?   inexact?
                   cons   null   car   cdr   null?   pair?   list
                   apply   void   values   call-with-values
                   vector   vector-immutable   vector-ref   vector-length   vector-set!
                   vector?
                   current-command-line-arguments
+                  boolean?
                   string?   string-append
                   raise
                   write-string   current-output-port   current-error-port)
-               (#%+ #%- #%* #%zero?
+               (#%+ #%- #%* #%zero? #%exact-integer? #%inexact?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
                 #%apply #%void #%values #%call-with-values
                 #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
                 #%vector?
                 #%current-command-line-arguments
+                #%boolean?
                 #%string? #%string-append
                 #%raise
                 #%write-string #%current-output-port #%current-error-port)))
@@ -132,7 +135,34 @@
   [(apply-op #%* (integer_1 integer_2))
    (integer-multiply integer_1 integer_2)]
 
+  [(apply-op #%+ (real_1 real_2))
+   (real-add real_1 real_2)]
+
+  [(apply-op #%- (real_1 real_2))
+   (real-subtract real_1 real_2)]
+
+  [(apply-op #%* (real_1 real_2))
+   (real-multiply real_1 real_2)]
+
+  [(apply-op #%exact-integer? (integer))
+   #t]
+
+  [(apply-op #%exact-integer? (V))
+   #f]
+
+  [(apply-op #%inexact? (real))
+   #t]
+
+  [(apply-op #%inexact? (V))
+   #f]
+
   [(apply-op #%zero? (0))
+   #t]
+
+  [(apply-op #%zero? (0.0))
+   #t]
+
+  [(apply-op #%zero? (-0.0))
    #t]
 
   [(apply-op #%zero? (V))
@@ -201,6 +231,12 @@
 
   [(apply-op #%current-command-line-arguments ())
    (ivec-of-elements)]
+
+  [(apply-op #%boolean? (boolean))
+   #t]
+
+  [(apply-op #%boolean? (V))
+   #f]
 
   [(apply-op #%string? (string))
    #t]
