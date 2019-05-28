@@ -331,4 +331,10 @@
   (test-equal (real-subtract 5.0 4.0) 1.0)
   (test-equal (add 1.0 1.0) 2.0)
   (test-not-equal 0.0 0.1)
+
+  (test-equal (integer->real 1) 1.0)
+  (test-equal (real->integer 0.0) 0)
+  (test-equal (real->integer 0.5) 0)
+  (test-equal (real->integer 1.9) 1)
+
   (jam-test))

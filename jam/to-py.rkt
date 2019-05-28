@@ -178,7 +178,8 @@
 (define (pythonify-name name)
   (define result
     (regexp-replaces (symbol->string name)
-                     '((#rx"-"  "_")
+                     '((#rx"->" "_arrow_")
+                       (#rx"-"  "_")
                        (#rx"\\?$" "")
                        (#rx"/" "")
                        (#rx"\\*" "star"))))
@@ -199,6 +200,8 @@
         'symbol 'make_symbol
         'integer 'make_integer
         'real 'make_real
+        'integer_of_real 'integer_of_real
+        'real_of_integer 'real_of_integer
         'string 'make_string
         'boolean 'make_boolean
         'hd 'get_hd

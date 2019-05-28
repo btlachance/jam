@@ -316,6 +316,14 @@ def real_multiply(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return v1.multiply(v2)
 
+def integer_of_real(t):
+  [r] = [v for v in W_TermList(t)]
+  return make_integer(int(r.real_value()))
+
+def real_of_integer(t):
+  [i] = [v for v in W_TermList(t)]
+  return make_real(float(i.int_value()))
+
 def string_append(t):
   [s1, s2] = [x for x in W_TermList(t)]
   return s1.append(s2)
