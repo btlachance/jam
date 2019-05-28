@@ -339,8 +339,12 @@
 
   (test-equal (integer-= 1 1) #t)
   (test-equal (integer-= 5 1) #f)
+  (test-equal (integer-< 1 5) #t)
+  (test-equal (integer-< 5 1) #f)
   (test-equal (real-= 5.0 5.0) #t)
   (test-equal (real-= 5.0 -1.0) #f)
+  (test-equal (real-< 4.0 5.0) #t)
+  (test-equal (real-< 5.0 4.0) #f)
 
   (test-equal (string-= "" "") #t)
   (test-equal (string-= "hello" "chips") #f)

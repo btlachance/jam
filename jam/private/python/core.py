@@ -305,6 +305,10 @@ def integer_equal(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return make_boolean(v1.atoms_equal(v2))
 
+def integer_lt(t):
+  [v1, v2] = [v for v in W_TermList(t)]
+  return make_boolean(v1.int_value() < v2.int_value())
+
 @jit.unroll_safe
 def real_add(t):
   [v1, v2] = [v for v in W_TermList(t)]
@@ -323,6 +327,10 @@ def real_multiply(t):
 def real_equal(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return make_boolean(v1.atoms_equal(v2))
+
+def real_lt(t):
+  [v1, v2] = [v for v in W_TermList(t)]
+  return make_boolean(v1.real_value() < v2.real_value())
 
 def integer_of_real(t):
   [r] = [v for v in W_TermList(t)]

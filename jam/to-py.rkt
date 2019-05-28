@@ -183,7 +183,8 @@
                        (#rx"\\?$" "")
                        (#rx"/" "")
                        (#rx"\\*" "star")
-                       (#rx"=" "equal"))))
+                       (#rx"=" "equal")
+                       (#rx"<" "lt"))))
 
   (match (sequence->list (generate-tokens (open-input-string result)))
     [(list `(NAME ,result . ,_) `(ENDMARKER . ,_))
@@ -205,6 +206,8 @@
         'real_of_integer 'real_of_integer
         'integer_equal 'integer_equal
         'real_equal 'real_equal
+        'integer_lt 'integer_lt
+        'real_lt 'real_lt
         'string 'make_string
         'boolean 'make_boolean
         'hd 'get_hd
