@@ -140,14 +140,16 @@
 ;; - (none)
 ;; - `(pair ,ir ,ir)
 ;; - `(symbol ,symbol)
-;; - `(integer ,integer)
+;; - `(real ,flonum)
+;; - `(integer ,exact-integer)
 ;; - `(boolean ,boolean)
 
 ;; - `(hd ,ir)
 ;; - `(tl ,ir)
 
 ;; - string
-;; - integer
+;; - exact-integer
+;; - flonum
 ;; - boolean
 
 ;; - `(= ,ir ,ir)
@@ -159,6 +161,7 @@
 ;; - `(pair? ,ir)
 ;; - `(symbol? ,ir)
 ;; - `(integer? ,ir)
+;; - `(real? ,ir)
 ;; - `(string? ,ir)
 ;; - `(boolean? ,ir)
 ;; - `(list? ,ir)
@@ -237,7 +240,8 @@
 ;; a core+grammar+mf-ir (cgmir) is one of
 ;; - var
 ;; - string
-;; - integer
+;; - exact-integer
+;; - flonum
 ;; - boolean
 ;; - `(if ,cgmir ,cgmir ,cgmir)
 ;; - `(not ,cgmir)
@@ -252,7 +256,8 @@
 ;; a core+mf-ir (cmir) is one of
 ;; - var
 ;; - string
-;; - integer
+;; - exact-integer
+;; - flonum
 ;; - boolean
 ;; - `(if ,cmir ,cmir ,cmir)
 ;; - `(not ,cmir)
@@ -265,7 +270,8 @@
 ;; a core-ir (cir) is one of
 ;; - var
 ;; - string
-;; - integer
+;; - exact-integer
+;; - flonum
 ;; - boolean
 ;; - `(if ,cir ,cir ,cir)
 ;; - `(not ,cir)
@@ -277,7 +283,8 @@
 ;; a proc-free core-ir (pfcir) is one of
 ;; - var
 ;; - string
-;; - integer
+;; - exact-integer
+;; - flonum
 ;; - boolean
 ;; - `(if ,pfcir ,pfcir ,pfcir)
 ;; - `(not ,pfcir)

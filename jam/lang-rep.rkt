@@ -423,6 +423,7 @@
    (metafunction
     'reverse
     (mf:data 'list_reverse (repeat-pattern '_)))
+
    (metafunction
     'integer-add
     (mf:data 'integer_add0 (pattern-of-ps (list integer-pattern integer-pattern))))
@@ -432,6 +433,17 @@
    (metafunction
     'integer-multiply
     (mf:data 'integer_multiply0 (pattern-of-ps (list integer-pattern integer-pattern))))
+
+   (metafunction
+    'real-add
+    (mf:data 'real_add (pattern-of-ps (list real-pattern real-pattern))))
+   (metafunction
+    'real-subtract
+    (mf:data 'real_subtract (pattern-of-ps (list real-pattern real-pattern))))
+   (metafunction
+    'real-multiply
+    (mf:data 'real_multiply (pattern-of-ps (list real-pattern real-pattern))))
+
    (metafunction
     'clock-milliseconds
     (mf:data 'clock_milliseconds (pattern-of-ps '())))

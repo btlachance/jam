@@ -12,6 +12,9 @@
          (hash 'integer n)
          (hash 'biginteger (number->string n)))]
 
+    [(and (? flonum? n) (not (? infinite?) (? nan?)))
+     (hash 'real n)]
+
     [(? string? s)
      (hash 'string s)]
 

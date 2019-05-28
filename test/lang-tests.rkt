@@ -308,12 +308,27 @@
   (test-equal (vars-of x) (x))
   (test-equal (vars-of (lambda (y) x)) (x))
   (test-equal (vars-of ((x y) x)) (x y x))
-  (jam-test))
 
-(module+ test
   (test-equal (system*/json-term "/bin/echo" "{\"integer\": 1}") 1)
   (test-equal (system*/json-term "/bin/echo" "{\"string\": \"sslothh\"}")
               "sslothh")
   (test-equal (system*/json-term "/bin/echo" "{\"boolean\": false}")
               #f)
+
+  (jam-test))
+
+(define-language real)
+(define-metafunction real
+  [(add real_1 real_2)
+   real_result
+   (where real_result (real-add real_1 real_2))])
+
+(module+ test
+  (current-test-language real)
+  (test-equal 1.0 1.0)
+  (test-equal (real-add 1.0 1.0) 2.0)
+  (test-equal (real-multiply 10.0 0.0) 0.0)
+  (test-equal (real-subtract 5.0 4.0) 1.0)
+  (test-equal (add 1.0 1.0) 2.0)
+  (test-not-equal 0.0 0.1)
   (jam-test))

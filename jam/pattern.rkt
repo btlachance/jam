@@ -12,20 +12,23 @@
          grammar-handle evaluator-handle core-handle
          (struct-out name) (struct-out literal) clause mf-apply pair
          nonterminal pattern-of-ps repeat-pattern integer-pattern
-         string-pattern)
+         string-pattern real-pattern)
 
+(define real-pattern 'real)
 (define integer-pattern 'integer)
 (define string-pattern 'string)
 
 ;; a datum is one of
 ;; - symbol
-;; - integer
+;; - exact-integer
+;; - flonum
 ;; - string
 ;; - boolean
 
 ;; a pattern is one of
 ;; - '_
 ;; - 'integer
+;; - 'real
 ;; - 'string
 ;; - 'boolean
 ;; - 'variable-not-otherwise-mentioned
@@ -50,12 +53,13 @@
 ;; match expanders to handle some of the repetitive things like
 ;; handling naming forms
 
-(define datum/c (or/c symbol? exact-integer? boolean?))
+(define datum/c (or/c symbol? string? flonum? exact-integer? boolean?))
 
 (define (fold-pattern-literals f z p)
   (match p
     ['_ z]
     [(== integer-pattern) z]
+    [(== real-pattern) z]
     [(== string-pattern) z]
     ['boolean z]
     ['variable-not-otherwise-mentioned z]
@@ -67,7 +71,7 @@
     [(pair p lp)
      (fold-pattern-literals f (fold-pattern-literals f z lp) p)]))
 
-(define pattern-keywords (set '_ integer-pattern string-pattern 'variable-not-otherwise-mentioned 'boolean))
+(define pattern-keywords (set '_ integer-pattern string-pattern real-pattern 'variable-not-otherwise-mentioned 'boolean))
 (define (pattern-keyword? x)
   (match x
     [(? identifier? id)
@@ -133,6 +137,9 @@
     [(== integer-pattern)
      `(integer? ,source)]
 
+    [(== real-pattern)
+     `(real? ,source)]
+
     [(== string-pattern)
      `(string? ,source)]
 
@@ -153,6 +160,9 @@
 
     [(literal (? exact-integer? n))
      `(= (integer ,n) ,source)]
+
+    [(literal (? flonum? n))
+     `(= (real ,n) ,source)]
 
     [(literal (? string? s))
      `(= (string ,s) ,source)]
@@ -180,6 +190,7 @@
          ;; this means literal integers and nil in a template might
          ;; need to be freshly allocated
          (literal (? exact-integer? _))
+         (literal (? flonum? _))
          (literal (? string? _))
          (literal (? boolean? _)))
      (hash)]
@@ -195,7 +206,7 @@
                  ;; this would be even rarer
      (hash)]
 
-    [(or (and s (or (== integer-pattern) (== string-pattern) 'variable-not-otherwise-mentioned 'boolean))
+    [(or (and s (or (== integer-pattern) (== real-pattern) (== string-pattern) 'variable-not-otherwise-mentioned 'boolean))
          (nonterminal s)
          (literal (? symbol? s))
          (name s _))
@@ -214,7 +225,7 @@
 (define (free-vars p)
   (match p
     [(or '_ '()) (set)]
-    [(or (and x (or (== integer-pattern) (== string-pattern) 'variable-not-otherwise-mentioned 'boolean))
+    [(or (and x (or (== integer-pattern) (== real-pattern) (== string-pattern) 'variable-not-otherwise-mentioned 'boolean))
          (literal (? symbol? x)))
      (set x)]
     [(name x _) (set x)]
@@ -247,7 +258,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
   (match template
     [(mf-apply lang-name name rand)
      `(mf-apply (lang ,lang-name) ,name ,(compile/t rand))]
-    [(and x (or (== integer-pattern) (== string-pattern) 'variable-not-otherwise-mentioned 'boolean))
+    [(and x (or (== integer-pattern) (== real-pattern) (== string-pattern) 'variable-not-otherwise-mentioned 'boolean))
      (unless (dict-has-key? env x)
        (error 'compile/transcribe "keyword in template is unbound\n\
   keyword: ~a" x))
@@ -282,6 +293,9 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 
     [(literal (? exact-integer? n))
      `(integer ,n)]
+
+    [(literal (? flonum? n))
+     `(real ,n)]
 
     [(literal (? string? s))
      `(string ,s)]
@@ -394,8 +408,12 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                                 prefix
                                 (nonterminal prefix)))]
 
-      [{~or :jam-id :integer :boolean :string}
+      [{~or :jam-id :exact-integer :boolean :string}
        (literal (syntax-e this-syntax))]
+
+      [r:expr
+       #:when (flonum? (syntax-e #'r))
+       (literal (syntax-e #'r))]
 
       [(name x:jam-id p)
        (name (syntax-e #'x) (recur* #'p))]
@@ -585,7 +603,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
       [_ (translate ir)]))
 
   (match ir
-    [(or (lexical-var* _) (module-var* _ _) (? string? _) (? exact-integer? _) (? boolean? _))
+    [(or (lexical-var* _) (module-var* _ _) (? string? _) (? exact-integer? _) (? flonum? _) (? boolean? _))
      ir]
 
     ['(nil) (call-prim 'nil)]
@@ -593,6 +611,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
     [`(pair ,hd ,tl) (call-prim 'pair (translate hd) (translate tl))]
     [`(symbol ,s) (call-prim 'symbol (symbol->string s))]
     [`(integer ,n) (call-prim 'integer n)]
+    [`(real ,n) (call-prim 'real n)]
     [`(string ,s) (call-prim 'string s)]
     [`(boolean ,b) (call-prim 'boolean b)]
 
@@ -609,6 +628,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
     [`(pair? ,arg) (call-prim 'pair? (translate arg))]
     [`(symbol? ,arg) (call-prim 'symbol? (translate arg))]
     [`(integer? ,arg) (call-prim 'integer? (translate arg))]
+    [`(real? ,arg) (call-prim 'real? (translate arg))]
     [`(string? ,arg) (call-prim 'string? (translate arg))]
     [`(boolean? ,arg) (call-prim 'boolean? (translate arg))]
     [`(list? ,arg) (call-prim 'list? (translate arg))]
@@ -736,7 +756,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
             "internal: got a grammar module that referred to itself\n\
   module: ~a" current-mod)]
 
-    [(or (lexical-var* _) (module-var* _ _) (? string? _) (? exact-integer? _) (? boolean? _))
+    [(or (lexical-var* _) (module-var* _ _) (? string? _) (? exact-integer? _) (? flonum? _) (? boolean? _))
      ir]
 
     [`(if ,e1 ,e2 ,e3)
@@ -861,7 +881,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
             "internal: got a metafunction module that referred to itself\n\
   module: ~a" current-mod)]
 
-    [(or (lexical-var* _) (module-var* _ _) (? string? _) (? exact-integer? _) (? boolean? _))
+    [(or (lexical-var* _) (module-var* _ _) (? string? _) (? exact-integer? _) (? flonum? _) (? boolean? _))
      ir]
 
     [`(if ,e1 ,e2 ,e3)
@@ -895,7 +915,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
                       (append (list core-handle) other-handles)))
       (provide)
 
-      ,@(for/list ([t '(() 5 x (x y) (let ([x 0] [y 1]) (+ x y)) #f #t "hello")])
+      ,@(for/list ([t '(() 5 x (x y) (let ([x 0] [y 1]) (+ x y)) #f #t "hello" 0.1)])
           (define test-message (format "smoke test ~a" t))
           (define cond
             `(call
@@ -1117,7 +1137,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
 
   (define (deproc-ir ir)
     (match ir
-      [(or (lexical-var* _) (module-var* _ _) (? string? _) (? exact-integer? _) (? boolean? _))
+      [(or (lexical-var* _) (module-var* _ _) (? string? _) (? exact-integer? _) (? flonum? _) (? boolean? _))
        (values ir '())]
 
       [`(if ,ir0 ,ir1 ,ir2)

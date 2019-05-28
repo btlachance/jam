@@ -198,6 +198,7 @@
         'pair 'make_pair
         'symbol 'make_symbol
         'integer 'make_integer
+        'real 'make_real
         'string 'make_string
         'boolean 'make_boolean
         'hd 'get_hd
@@ -207,6 +208,7 @@
         'pair? 'is_pair
         'symbol? 'is_symbol
         'integer? 'is_integer
+        'real? 'is_real
         'string? 'is_string
         'boolean? 'is_boolean
         'list? 'is_list
@@ -227,6 +229,9 @@
         'integer_add0 'integer_add0
         'integer_subtract0 'integer_subtract0
         'integer_multiply0 'integer_multiply0
+        'real_add 'real_add
+        'real_subtract 'real_subtract
+        'real_multiply 'real_multiply
         'is_environment 'is_environment
         'environment_lookup 'environment_lookup
         'environment_is_bound 'environment_is_bound
@@ -278,6 +283,7 @@
           [_ (pythonify-name name)]))]
 
     [(? string? s) s]
+    [(? flonum? f) f]
     [(? exact-integer? n) n] ;; XXX What if n is a bignum? Error?
     [(? boolean? b) b]
 

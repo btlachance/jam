@@ -53,6 +53,8 @@ class W_Term(object):
     return False
   def is_integer(self):
     return False
+  def is_real(self):
+    return False
   def is_boolean(self):
     return False
   def is_none(self):
@@ -82,6 +84,8 @@ class W_Term(object):
     return self.is_nil() and o.equals_same(self)
   def equals_integer(self, n):
     return self.is_integer() and n.equals_same(self)
+  def equals_real(self, n):
+    return self.is_real() and n.equals_same(self)
   def equals_symbol(self, s):
     return self.is_symbol() and s.equals_same(self)
   def equals_boolean(self, b):
@@ -91,6 +95,8 @@ class W_Term(object):
 
   def int_value(self):
     bail("internal: Not an integer")
+  def real_value(self):
+    bail("internal: Not a real")
   def sym_value(self):
     bail("internal: Not a symbol")
   def bool_value(self):
@@ -243,6 +249,43 @@ class W_Integer(W_Term):
   def multiply_same(self, other):
     return W_Integer(self.n * other.n)
 
+class W_Real(W_Term):
+  _immutable_fields_ = ['n']
+  def __init__(self, n):
+    W_Term.__init__(self)
+    self.n = n
+  def is_real(self):
+    return True
+  def atoms_equal(self, other):
+    return other.equals_real(self)
+  def equals_same(self, n):
+    return self.real_value() == n.real_value()
+  def real_value(self):
+    return self.n
+  def to_string(self):
+    return '%s' % self.real_value()
+
+  def add(self, other):
+    if not isinstance(other, W_Real):
+      bail("add: not two reals")
+    return self.add_same(other)
+  def add_same(self, other):
+    return W_Real(self.n + other.n)
+
+  def subtract(self, other):
+    if not isinstance(other, W_Real):
+      bail("subtract: not two reals")
+    return self.subtract_same(other)
+  def subtract_same(self, other):
+    return W_Real(self.n - other.n)
+
+  def multiply(self, other):
+    if not isinstance(other, W_Real):
+      bail("multiply: not two reals")
+    return self.multiply_same(other)
+  def multiply_same(self, other):
+    return W_Real(self.n * other.n)
+
 @jit.unroll_safe
 def integer_add0(t):
   [v1, v2] = [v for v in W_TermList(t)]
@@ -255,6 +298,21 @@ def integer_subtract0(t):
 
 @jit.unroll_safe
 def integer_multiply0(t):
+  [v1, v2] = [v for v in W_TermList(t)]
+  return v1.multiply(v2)
+
+@jit.unroll_safe
+def real_add(t):
+  [v1, v2] = [v for v in W_TermList(t)]
+  return v1.add(v2)
+
+@jit.unroll_safe
+def real_subtract(t):
+  [v1, v2] = [v for v in W_TermList(t)]
+  return v1.subtract(v2)
+
+@jit.unroll_safe
+def real_multiply(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return v1.multiply(v2)
 
@@ -420,6 +478,9 @@ def make_symbol(s):
 def make_integer(n):
   return W_Integer(n)
 
+def make_real(n):
+  return W_Real(n)
+
 def make_string(s):
   return W_String(s)
 
@@ -456,6 +517,9 @@ def is_symbol(t):
 
 def is_integer(t):
   return t.is_integer()
+
+def is_real(t):
+  return t.is_real()
 
 def is_string(t):
   return t.is_string()
@@ -611,6 +675,11 @@ def json_to_term(v):
     if not (tmp_i and tmp_i.is_int):
       bail("internal: integer json didn't contain an int")
     return make_integer(tmp_i.value_int())
+  if "real" in obj:
+    tmp_d = obj.get("real", None)
+    if not (tmp_d and tmp_d.is_float):
+      bail("internal: real json didn't contain a float")
+    return make_real(tmp_d.value_float())
   if "string" in obj:
     tmp_s = obj.get("string", None)
     if not (tmp_s and tmp_s.is_string):
@@ -875,9 +944,6 @@ def clock_milliseconds(t):
   return make_integer(int(time.clock() * 1000))
 
 class W_Sequence(W_Term):
-  def __init__(self):
-    W_Term.__init__(self)
-
   elements = subclass_responsibility0
   set = subclass_responsibility2
 
@@ -976,7 +1042,7 @@ class W_File(W_Term):
   def to_string(self):
     return "#%file"
 
-class W_StrictFile(W_Term):
+class W_StrictFile(W_File):
   def __init__(self, file):
     W_File.__init__(self)
     self.file = file
