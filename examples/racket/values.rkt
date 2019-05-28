@@ -27,3 +27,6 @@ values
                         #f
                         (even? (- n 1)))))])
   (even? 10))
+
+(let-values ([(vs cpu real gc) (time-apply + (list 1 2))])
+  cpu)

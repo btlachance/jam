@@ -20,6 +20,7 @@
 
   (V     ::= {env l} c mvec ivec file
              #%+ #%- #%* #%zero? #%exact-integer? #%inexact?
+             #%inexact->exact #%exact->inexact
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
              #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
@@ -28,7 +29,8 @@
              #%boolean?
              #%string? #%string-append
              #%raise ;; XXX FYFF gives a semantics where raise isn't prim
-             #%write-string #%current-output-port #%current-error-port)
+             #%write-string #%current-output-port #%current-error-port
+             #%current-inexact-milliseconds)
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
@@ -62,6 +64,7 @@
    (where env (env-extend
                env
                (  +   -   *   zero?   exact-integer?   inexact?
+                  inexact->exact   exact->inexact
                   cons   null   car   cdr   null?   pair?   list
                   apply   void   values   call-with-values
                   vector   vector-immutable   vector-ref   vector-length   vector-set!
@@ -70,8 +73,10 @@
                   boolean?
                   string?   string-append
                   raise
-                  write-string   current-output-port   current-error-port)
+                  write-string   current-output-port   current-error-port
+                  current-inexact-milliseconds)
                (#%+ #%- #%* #%zero? #%exact-integer? #%inexact?
+                #%inexact->exact #%exact->inexact
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
                 #%apply #%void #%values #%call-with-values
                 #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
@@ -80,7 +85,8 @@
                 #%boolean?
                 #%string? #%string-append
                 #%raise
-                #%write-string #%current-output-port #%current-error-port)))
+                #%write-string #%current-output-port #%current-error-port
+                #%current-inexact-milliseconds)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
 (define-metafunction pl
@@ -153,7 +159,7 @@
   [(apply-op #%inexact? (real))
    #t]
 
-  [(apply-op #%inexact? (V))
+  [(apply-op #%inexact? (integer))
    #f]
 
   [(apply-op #%zero? (0))
@@ -167,6 +173,20 @@
 
   [(apply-op #%zero? (V))
    #f]
+
+  [(apply-op #%exact->inexact (integer))
+   (integer->real integer)]
+
+  [(apply-op #%exact->inexact (real))
+   real]
+
+  ;; XXX This isn't quite right since real->integer truncates,
+  ;; but until I have rationals it's the best I can do
+  [(apply-op #%inexact->exact (real))
+   (real->integer real)]
+
+  [(apply-op #%inexact->exact (integer))
+   integer]
 
   [(apply-op #%cons (V_1 V_2))
    (#%cons V_1 V_2)]
@@ -260,7 +280,10 @@
    (where () (file-write file string))]
 
   [(apply-op #%write-string (string))
-   (apply-op #%write-string (string (file-stdout)))])
+   (apply-op #%write-string (string (file-stdout)))]
+
+  [(apply-op #%current-inexact-milliseconds ())
+   (integer->real (clock-milliseconds))])
 
 (define-metafunction pl
   [(prefix-and-rest () (V_rest ...))

@@ -18,4 +18,9 @@
 
 (inexact? 1.0)
 (inexact? 0)
-(inexact? #f)
+
+(exact->inexact 1.0)
+(exact->inexact 1)
+
+(inexact->exact 1.0)
+(inexact->exact 1)
