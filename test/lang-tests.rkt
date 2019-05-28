@@ -350,4 +350,7 @@
   (test-equal (string-= "hello" "chips") #f)
   (test-equal (string-= "chips" "chips") #t)
 
+  (test-equal (integer-string 1) "1")
+  (test-equal (real-string 1.3) "1.3")
+
   (jam-test))

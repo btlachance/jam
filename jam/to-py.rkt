@@ -262,6 +262,8 @@
         'string_equal 'string_equal
         'is_file 'is_file
         'file_write 'file_write
+        'integer_string 'integer_string
+        'real_string 'real_string
         'get_stdout 'get_stdout
         'get_stderr 'get_stderr
         'stdout 'stdout

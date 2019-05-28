@@ -340,6 +340,14 @@ def real_of_integer(t):
   [i] = [v for v in W_TermList(t)]
   return make_real(float(i.int_value()))
 
+def integer_string(t):
+  [i] = [v for v in W_TermList(t)]
+  return make_string(i.to_toplevel_string())
+
+def real_string(t):
+  [r] = [v for v in W_TermList(t)]
+  return make_string(r.to_toplevel_string())
+
 def string_append(t):
   [s1, s2] = [x for x in W_TermList(t)]
   return s1.append(s2)
