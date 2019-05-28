@@ -452,6 +452,13 @@
     (mf:data 'real_of_integer (pattern-of-ps (list integer-pattern))))
 
    (metafunction
+    'integer-=
+    (mf:data 'integer_equal (pattern-of-ps (list integer-pattern integer-pattern))))
+   (metafunction
+    'real-=
+    (mf:data 'real_equal (pattern-of-ps (list real-pattern real-pattern))))
+
+   (metafunction
     'clock-milliseconds
     (mf:data 'clock_milliseconds (pattern-of-ps '())))
 

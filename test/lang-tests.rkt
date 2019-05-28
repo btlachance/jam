@@ -337,4 +337,9 @@
   (test-equal (real->integer 0.5) 0)
   (test-equal (real->integer 1.9) 1)
 
+  (test-equal (integer-= 1 1) #t)
+  (test-equal (integer-= 5 1) #f)
+  (test-equal (real-= 5.0 5.0) #t)
+  (test-equal (real-= 5.0 -1.0) #f)
+
   (jam-test))
