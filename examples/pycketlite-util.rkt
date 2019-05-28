@@ -8,7 +8,14 @@
     [(module name lang
        (#%module-begin mod-config
                        forms ...))
-     (map form->pycketlite (attribute forms))]))
+     (define (drop? stx)
+       (syntax-parse stx
+         #:literal-sets (kernel-literals)
+         [(define-syntaxes (:id ...) e) #t]
+         [(#%require _ ...) #t]
+         [_ #f]))
+
+     (map form->pycketlite (filter (negate drop?) (attribute forms)))]))
 
 (define (form->pycketlite f)
   (syntax-parse f
