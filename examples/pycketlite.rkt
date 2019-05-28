@@ -20,14 +20,14 @@
 
   (V     ::= {env l} c mvec ivec file
              #%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%=
-             #%inexact->exact #%exact->inexact
+             #%inexact->exact #%exact->inexact #%number?
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
              #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
              #%vector?
              #%current-command-line-arguments
-             #%boolean?
-             #%string? #%string-append
+             #%boolean? #%not
+             #%string? #%string-append #%string=?
              #%raise ;; XXX FYFF gives a semantics where raise isn't prim
              #%write-string #%current-output-port #%current-error-port
              #%current-inexact-milliseconds)
@@ -64,26 +64,26 @@
    (where env (env-extend
                env
                (  +   -   *   zero?   exact-integer?   inexact?   =
-                  inexact->exact   exact->inexact
+                  inexact->exact   exact->inexact   number?
                   cons   null   car   cdr   null?   pair?   list
                   apply   void   values   call-with-values
                   vector   vector-immutable   vector-ref   vector-length   vector-set!
                   vector?
                   current-command-line-arguments
-                  boolean?
-                  string?   string-append
+                  boolean?   not
+                  string?   string-append   string=?
                   raise
                   write-string   current-output-port   current-error-port
                   current-inexact-milliseconds)
                (#%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%=
-                #%inexact->exact #%exact->inexact
+                #%inexact->exact #%exact->inexact #%number?
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
                 #%apply #%void #%values #%call-with-values
                 #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
                 #%vector?
                 #%current-command-line-arguments
-                #%boolean?
-                #%string? #%string-append
+                #%boolean? #%not
+                #%string? #%string-append #%string=?
                 #%raise
                 #%write-string #%current-output-port #%current-error-port
                 #%current-inexact-milliseconds)))
@@ -172,6 +172,15 @@
    #t]
 
   [(apply-op #%zero? (V))
+   #f]
+
+  [(apply-op #%number? (integer))
+   #t]
+
+  [(apply-op #%number? (real))
+   #t]
+
+  [(apply-op #%number? (V))
    #f]
 
   [(apply-op #%= (integer))
@@ -276,6 +285,12 @@
   [(apply-op #%boolean? (V))
    #f]
 
+  [(apply-op #%not (#f))
+   #t]
+
+  [(apply-op #%not (V))
+   #f]
+
   [(apply-op #%string? (string))
    #t]
 
@@ -286,6 +301,9 @@
 
   [(apply-op #%string-append (string_0 string ...))
    (string-append string_0 (apply-op #%string-append (string ...)))]
+
+  [(apply-op #%string=? (string_1 string_2))
+   (string-= string_1 string_2)]
 
   [(apply-op #%current-output-port ())
    (file-stdout)]

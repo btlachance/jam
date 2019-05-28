@@ -1,6 +1,21 @@
 #lang racket
 (define (newline) (write-string "\n"))
 
+(define (equal? v1 v2)
+  (if (and (number? v1) (number? v2))
+      (= v1 v2)
+      (if (and (boolean? v1) (boolean? v2))
+          (or (and v1 v2) (and (not v1) (not v2)))
+          (if (and (string? v1) (string? v2))
+              (string=? v1 v2)
+              (if (and (null? v1) (null? v2))
+                  #t
+                  (if (and (pair? v1) (pair? v2))
+                      (and (equal? (car v1) (car v2))
+                           (equal? (cdr v1) (cdr v2)))
+                      ;; XXX need vectors, ports
+                      #f))))))
+
 (define (time-apply f vs)
     (let* ([then (current-inexact-milliseconds)]
            [results (call-with-values (lambda () (apply f vs)) list)]

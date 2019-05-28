@@ -19,6 +19,10 @@
 (inexact? 1.0)
 (inexact? 0)
 
+(number? "chips")
+(number? 1)
+(number? 13.0)
+
 (exact->inexact 1.0)
 (exact->inexact 1)
 
