@@ -36,6 +36,11 @@
                   (write (symbol->string v))
                   (raise))))))
 
+(define (display v)
+  (if (string? v)
+      (write v)
+      (raise)))
+
 (define (fprintf out format . vs)
   ;; XXX This is the format-string for time in the pycket/wrap language
   (if (equal? format "RESULT-cpu: ~a.0\nRESULT-gc: ~a.0\nRESULT-total: ~a.0\n")
