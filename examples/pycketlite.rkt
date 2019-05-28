@@ -11,9 +11,12 @@
   (P     ::= (t ...))
   (t     ::= e (define-values (x ...) e))
   (e     ::= x l (quote c) (e e ...) (if e e e)
-             (let-values ([(x ...) e] ...) e)
-             (letrec-values ([(x ...) e] ...) e))
-  (l     ::= (lambda (x ...) e) (lambda x e) (lambda (x ...) (dot x) e))
+             (let-values ([(x ...) e] ...) e e ...)
+             (letrec-values ([(x ...) e] ...) e e ...)
+             (begin e e ...))
+  (l     ::= (lambda (x ...) e e ...)
+             (lambda x e e ...)
+             (lambda (x ...) (dot x) e e ...))
 
   (x y z ::= variable-not-otherwise-mentioned)
   (c     ::= integer real boolean string)
@@ -40,19 +43,21 @@
              ;; (x ...)           variables the current RHS results will be bound to
              ;; ([(x ...) e] ...) remaining variables to bind/RHS to evaluate
              ;; ((x V) ...)       variables/values for evaluated RHS so far
-             ;; e                 body expression
+             ;; (e e ...)         body expressions
              ;;
              ;; (We could keep the list of variables/values as two
              ;; lists instead of one zipped one if we had an explicit
              ;; way to check that #values returned to the continuation
              ;; matched #variables for the current RHS)
-             (letk env (x ...) ([(x ...) e] ...) ((x V) ...) e k)
+             (letk env (x ...) ([(x ...) e] ...) ((x V) ...) (e e ...) k)
 
              ;; Like letk but RHS and the body are evaluated in the
              ;; same environment, and values are set in that
              ;; environment once they're available, so no need for a
              ;; separate list of variables/values so far
-             (letreck env (x ...) ([(x ...) e] ...) e k)))
+             (letreck env (x ...) ([(x ...) e] ...) (e e ...) k)
+
+             (begink env (e e ...) k)))
 (module+ test
   (current-test-language pl))
 
@@ -340,6 +345,10 @@
    ((V_0 V_prefix ...) V_rest)
    (where ((V_prefix ...) V_rest) (prefix-and-rest (y ...) (V ...)))])
 
+(define-metafunction pl
+  [(begink* env () k) k]
+  [(begink* env (e e_rest ...) k) (begink env (e e_rest ...) k)])
+
 (define-transition pl
   step
   [--> (topk env (t t_rest ...))
@@ -367,20 +376,23 @@
   [--> ((if e_test e_then e_else) env k)
        (e_test env (ifk env e_then e_else k))]
 
-  [--> ((let-values () e) env k)
-       (e env k)]
+  [--> ((let-values () e e_rest ...) env k)
+       (e env (begink* env (e_rest ...) k))]
 
-  [--> ((let-values ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) e_body) env k)
+  [--> ((let-values ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) e_body ...) env k)
        (e_first env (letk env (x_first ...) ([(x_rest ...) e_rest] ...)
-                          () e_body k))]
+                          () (e_body ...) k))]
 
-  [--> ((letrec-values () e) env k)
-       (e env k)]
+  [--> ((letrec-values () e e_rest ...) env k)
+       (e env (begink* env (e_rest ...) k))]
 
-  [--> ((letrec-values ([(x ...) e] ...) e_body) env k)
-       (e_first env_rec (letreck env_rec (x_first ...) ([(x_rest ...) e_rest] ...) e_body k))
+  [--> ((letrec-values ([(x ...) e] ...) e_body ...) env k)
+       (e_first env_rec (letreck env_rec (x_first ...) ([(x_rest ...) e_rest] ...) (e_body ...) k))
        (where ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) ([(x ...) e] ...))
        (where env_rec (env-extend-cells env (flatten-vars ((x ...) ...))))]
+
+  [--> ((begin e e_rest ...) env k)
+       (e env (begink* env (e_rest ...) k))]
 
   [--> (V k*)
        ((#%values V) k*)]
@@ -398,18 +410,18 @@
        (e_arg env (appk env (e_args ...) (V_0 V ...) k))]
 
   [--> (V_0 (appk _ () (V ...) k))
-       (e env_e k)
-       (where ({env_op (lambda (x ...) e)} V ...) (reverse (V_0 V ...)))
+       (e env_e (begink* env_e (e_rest ...) k))
+       (where ({env_op (lambda (x ...) e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where env_e (env-extend env_op (x ...) (V ...)))]
 
   [--> (V_0 (appk _ () (V ...) k))
-       (e env_e k)
-       (where ({env_op (lambda x e)} V ...) (reverse (V_0 V ...)))
+       (e env_e (begink* env_e (e_rest ...) k))
+       (where ({env_op (lambda x e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where env_e (env-extend env_op (x) ((apply-op #%list (V ...)))))]
 
   [--> (V_0 (appk _ () (V ...) k))
-       (e env_e k)
-       (where ({env_op (lambda (x ...) (dot y) e)} V ...) (reverse (V_0 V ...)))
+       (e env_e (begink* env_e (e_rest ...) k))
+       (where ({env_op (lambda (x ...) (dot y) e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where ((V_prefix ...) V_rest) (prefix-and-rest (x ...) (V ...)))
        (where env_e (env-extend env_op
                                 (append (x ...) (y))
@@ -431,9 +443,9 @@
        (where (#%values V_vals ...) (reverse (V_0 V ...)))]
 
   [--> (V_0 (appk _ () (V ...) k))
-       (e env (cwvk V_consumer k))
+       (e env (begink* env (e_rest ...) (cwvk V_consumer k)))
        (where (#%call-with-values V_producer V_consumer) (reverse (V_0 V ...)))
-       (where {env (lambda () e)} V_producer)]
+       (where {env (lambda () e e_rest ...)} V_producer)]
 
   [--> ((#%values V ...) (cwvk V_consumer k))
        (V_lastval (appk (env-empty) () (V ...) k))
@@ -448,30 +460,33 @@
        (where V_result (apply-op V_op (V ...)))]
 
   [--> ((#%values V_new ...) (letk env_e (x_new ...) ([(x ...) e] [(x_rest ...) e_rest] ...)
-                                   (name sofar _) e_body k))
+                                   (name sofar _) (e_body ...) k))
        (e env_e (letk env_e (x ...) ([(x_rest ...) e_rest] ...)
                       (append ((x_new V_new) ...) ((x_sofar V_sofar) ...))
-                      e_body k))
+                      (e_body ...) k))
        (where ((x_sofar V_sofar) ...) sofar)]
 
   [--> ((#%values V_new ...) (letk env (x_new ...) ()
-                                   ((x_sofar V_sofar) ...) e_body k))
-       (e_body env_body k)
+                                   ((x_sofar V_sofar) ...) (e e_rest ...) k))
+       (e env_body (begink* env_body (e_rest ...) k))
        (where env_body (env-extend env
                                    (append (x_new ...) (x_sofar ...))
                                    (append (V_new ...) (V_sofar ...))))]
 
   [--> ((#%values V_new ...) (letreck env_rec (x_new ...)
                                       ([(x ...) e] [(x_rest ...) e_rest] ...)
-                                      e_body k))
+                                      (e_body ...) k))
        (e env_rec (letreck env_rec (x ...)
                          ([(x_rest ...) e_rest] ...)
-                         e_body k))
+                         (e_body ...) k))
        (where () (env-set-cells env_rec (x_new ...) (V_new ...)))]
 
-  [--> ((#%values V_new ...) (letreck env_rec (x_new ...) () e_body k))
-       (e_body env_rec k)
+  [--> ((#%values V_new ...) (letreck env_rec (x_new ...) () (e e_rest ...) k))
+       (e env_rec (begink* env_rec (e_rest ...) k))
        (where () (env-set-cells env_rec (x_new ...) (V_new ...)))]
+
+  [--> ((#%values V ...) (begink env (e e_rest ...) k))
+       (e env (begink* env (e_rest ...) k))]
 
   [--> (#f (ifk env _ e_else k))
        (e_else env k)]
@@ -709,6 +724,11 @@
   (test-equal (run-eval-e (vector? (vector-immutable))) #t)
   (test-equal (run-eval-e (vector? '1)) #f)
   (test-equal (run-eval-e (vector? '"hello")) #f)
+
+  (test-equal (run-eval-e (begin '1)) 1)
+  (test-equal (run-eval-e (begin '1 '2)) 2)
+  (test-equal (run-eval-e (begin '1 '2 '3)) 3)
+  (test-equal (run-eval-e (begin (values) '4)) 4)
 
   (test-equal (run-eval
                ('1

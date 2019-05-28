@@ -28,26 +28,28 @@
 (define (expr->pycketlite e)
   (syntax-parse e
     #:literal-sets (kernel-literals)
-    [(#%plain-lambda (x ...) e)
-     `(lambda ,(map syntax-e (attribute x)) ,(expr->pycketlite #'e))]
+    [(#%plain-lambda (x ...) e ...+)
+     `(lambda ,(map syntax-e (attribute x))
+        ,@(map expr->pycketlite (attribute e)))]
 
-    [(#%plain-lambda x:id e)
-     `(lambda ,(syntax-e #'x) ,(expr->pycketlite #'e))]
+    [(#%plain-lambda x:id e ...+)
+     `(lambda ,(syntax-e #'x)
+        ,@(map expr->pycketlite (attribute e)))]
 
-    [(#%plain-lambda (x ... . y) e)
+    [(#%plain-lambda (x ... . y) e ...+)
      `(lambda ,(map syntax-e (attribute x)) (dot ,(syntax-e #'y))
-              ,(expr->pycketlite #'e))]
+              ,@(map expr->pycketlite (attribute e)))]
 
     [(if e1 e2 e3)
      `(if ,(expr->pycketlite #'e1)
           ,(expr->pycketlite #'e2)
           ,(expr->pycketlite #'e3))]
 
-    [((~and form (~or let-values letrec-values)) ([(x ...) e] ...) e_body)
+    [((~and form (~or let-values letrec-values)) ([(x ...) e] ...) e_body ...+)
      (let ([x* (syntax->datum #'((x ...) ...))]
            [e* (map expr->pycketlite (attribute e))])
        `(,(syntax-e #'form) ,(map list x* e*)
-                            ,(expr->pycketlite #'e_body)))]
+                            ,@(map expr->pycketlite (attribute e_body))))]
 
     [(quote c)
      #:when (datum? (syntax-e #'c))
