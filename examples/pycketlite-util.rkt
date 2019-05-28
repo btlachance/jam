@@ -51,6 +51,8 @@
        `(,(syntax-e #'form) ,(map list x* e*)
                             ,@(map expr->pycketlite (attribute e_body))))]
 
+    [(begin e ...+) `(begin ,@(map expr->pycketlite (attribute e)))]
+
     [(quote c)
      #:when (datum? (syntax-e #'c))
      (syntax->datum this-syntax)]
