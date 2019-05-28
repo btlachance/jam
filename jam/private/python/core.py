@@ -340,6 +340,10 @@ def string_length(t):
   [s] = [x for x in W_TermList(t)]
   return make_integer(s.length())
 
+def string_equal(t):
+  [s1, s2] = [x for x in W_TermList(t)]
+  return make_boolean(s1.string_value() == s2.string_value())
+
 class W_Boolean(W_Term):
   _immutable_fields_ = ['b']
   def __init__(self, b):

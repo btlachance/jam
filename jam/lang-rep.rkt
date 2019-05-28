@@ -468,6 +468,9 @@
    (metafunction
     'string-length
     (mf:data 'string_length (pattern-of-ps (list string-pattern))))
+   (metafunction
+    'string-=
+    (mf:data 'string_equal (pattern-of-ps (list string-pattern string-pattern))))
 
    (metafunction
     'system*/json-term

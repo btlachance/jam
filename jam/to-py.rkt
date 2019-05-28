@@ -256,6 +256,7 @@
         'sequence_length 'sequence_length
         'string_append 'string_append
         'string_length 'string_length
+        'string_equal 'string_equal
         'is_file 'is_file
         'file_write 'file_write
         'get_stdout 'get_stdout

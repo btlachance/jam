@@ -342,4 +342,8 @@
   (test-equal (real-= 5.0 5.0) #t)
   (test-equal (real-= 5.0 -1.0) #f)
 
+  (test-equal (string-= "" "") #t)
+  (test-equal (string-= "hello" "chips") #f)
+  (test-equal (string-= "chips" "chips") #t)
+
   (jam-test))
