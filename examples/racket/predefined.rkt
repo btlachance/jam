@@ -10,11 +10,13 @@
               (string=? v1 v2)
               (if (and (null? v1) (null? v2))
                   #t
-                  (if (and (pair? v1) (pair? v2))
-                      (and (equal? (car v1) (car v2))
-                           (equal? (cdr v1) (cdr v2)))
-                      ;; XXX need vectors, ports
-                      #f))))))
+                  (if (and (symbol? v1) (symbol? v2))
+                      (symbol=? v1 v2)
+                      (if (and (pair? v1) (pair? v2))
+                          (and (equal? (car v1) (car v2))
+                               (equal? (cdr v1) (cdr v2)))
+                          ;; XXX need vectors, ports
+                          (raise))))))))
 
 (define (time-apply f vs)
     (let* ([then (current-inexact-milliseconds)]

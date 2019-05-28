@@ -20,3 +20,4 @@
 (map list1 (cons #t (cons #f (cons 4 null))))
 (map list1 (list #t #f 4))
 
+(list 'a 'b (symbol? 'c))

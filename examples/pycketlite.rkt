@@ -19,7 +19,7 @@
              (lambda (x ...) (dot x) e e ...))
 
   (x y z ::= variable-not-otherwise-mentioned)
-  (c     ::= integer real boolean string)
+  (c     ::= integer real boolean string (#%s string))
 
   (V     ::= {env l} c mvec ivec file
              #%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%= #%<
@@ -33,6 +33,8 @@
              #%string? #%string-append #%string=?
              #%raise ;; XXX FYFF gives a semantics where raise isn't prim
              #%write-string #%current-output-port #%current-error-port
+             #%number->string
+             #%symbol? #%symbol=? #%symbol->string
              #%current-inexact-milliseconds)
 
   (k     ::= k1 k*)
@@ -79,6 +81,8 @@
                   string?   string-append   string=?
                   raise
                   write-string   current-output-port   current-error-port
+                  number->string
+                  symbol?   symbol=?   symbol->string
                   current-inexact-milliseconds)
                (#%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%= #%<
                 #%inexact->exact #%exact->inexact #%number?
@@ -91,6 +95,8 @@
                 #%string? #%string-append #%string=?
                 #%raise
                 #%write-string #%current-output-port #%current-error-port
+                #%number->string
+                #%symbol? #%symbol=? #%symbol->string
                 #%current-inexact-milliseconds)))
    (where env (env-extend-cells env (x_toplevel ...)))])
 
@@ -334,6 +340,24 @@
 
   [(apply-op #%write-string (string))
    (apply-op #%write-string (string (file-stdout)))]
+
+  [(apply-op #%number->string (integer))
+   (integer-string integer)]
+
+  [(apply-op #%number->string (real))
+   (real-string real)]
+
+  [(apply-op #%symbol? ((#%s string)))
+   #t]
+
+  [(apply-op #%symbol? (V))
+   #f]
+
+  [(apply-op #%symbol=? (((name _1 #%s) string_1) ((name _2 #%s) string_2)))
+   (string-= string_1 string_2)]
+
+  [(apply-op #%symbol->string ((#%s string)))
+   string]
 
   [(apply-op #%current-inexact-milliseconds ())
    (integer->real (clock-milliseconds))])

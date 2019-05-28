@@ -7,3 +7,7 @@
 (equal? #t #t)
 (equal? #t #f)
 (equal? #f #f)
+
+(equal? 'a 'a)
+(equal? 'a 'b)
+

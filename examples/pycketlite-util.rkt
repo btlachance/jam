@@ -23,7 +23,7 @@
     [(define-values (x ...) e)
      `(define-values ,(map syntax-e (attribute x)) ,(expr->pycketlite #'e))]))
 
-(define datum? (disjoin exact-integer? flonum? boolean? string?))
+(define datum? (disjoin exact-integer? flonum? boolean? string? symbol?))
 
 (define (expr->pycketlite e)
   (syntax-parse e
@@ -55,7 +55,9 @@
 
     [(quote c)
      #:when (datum? (syntax-e #'c))
-     (syntax->datum this-syntax)]
+     (if (identifier? #'c)
+         `(quote (#%s ,(~a (syntax-e #'c))))
+         (syntax->datum this-syntax))]
 
     [(#%plain-app e e* ...)
      (cons (expr->pycketlite #'e) (map expr->pycketlite (attribute e*)))]
