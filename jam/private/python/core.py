@@ -305,6 +305,7 @@ def integer_equal(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return make_boolean(v1.atoms_equal(v2))
 
+@jit.unroll_safe
 def integer_lt(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return make_boolean(v1.int_value() < v2.int_value())
