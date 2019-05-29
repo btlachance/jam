@@ -181,6 +181,7 @@
                      '((#rx"->" "_arrow_")
                        (#rx"-"  "_")
                        (#rx"\\?$" "")
+                       (#rx"!$" "")
                        (#rx"/" "")
                        (#rx"\\*" "star")
                        (#rx"=" "equal")
@@ -281,6 +282,7 @@
         'store_extend 'store_extend
         'store_update_location 'store_update_location
         'store_dereference 'store_dereference
+        'term_set_can_enter 'term_set_can_enter
         ))
 ;; A cheap way to test that this hash is partly consistent with
 ;; core.py is to generate a python module that tries to import all of

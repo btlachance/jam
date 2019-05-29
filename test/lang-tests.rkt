@@ -360,6 +360,8 @@
   (test-equal (integer-string 1) "1")
   (test-equal (real-string 1.3) "1.3")
 
+  (test-equal (can-enter! 1) ())
+
   (jam-test))
 
 (define-language store

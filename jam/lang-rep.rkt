@@ -505,6 +505,10 @@
    (metafunction
     'system*/json-term
     (mf:data 'systemstar_json_term (repeat-pattern string-pattern)))
+
+   (metafunction
+    'can-enter!
+    (mf:data 'term_set_can_enter (pattern-of-ps (list '_))))
    ))
 
 (define (nonterminal-metafunctions nt-names nts rep)

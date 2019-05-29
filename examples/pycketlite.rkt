@@ -521,14 +521,16 @@
        (where ({env_op (lambda (x ...) e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where (loc ...) (fresh-distinct-locations store (x ...)))
        (where env_e (env-extend env_op (x ...) (loc ...)))
-       (where () (store-extend* store (loc ...) (V ...)))]
+       (where () (store-extend* store (loc ...) (V ...)))
+       (where () (can-enter! e))]
 
   [--> (V_0 store (appk _ () (V ...) k))
        (e env_e store (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda x e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where (loc) (fresh-distinct-locations store (x)))
        (where env_e (env-extend env_op (x) (loc)))
-       (where () (store-extend store loc (apply-op #%list (V ...))))]
+       (where () (store-extend store loc (apply-op #%list (V ...))))
+       (where () (can-enter! e))]
 
   [--> (V_0 store (appk _ () (V ...) k))
        (e env_e store (begink* env_e (e_rest ...) k))
@@ -539,7 +541,8 @@
        (where env_e (env-extend env_op
                                 (x_args ...)
                                 (loc ...)))
-       (where () (store-extend* store (loc ...) (append (V_prefix ...) (V_rest))))]
+       (where () (store-extend* store (loc ...) (append (V_prefix ...) (V_rest))))
+       (where () (can-enter! e))]
 
   [--> (V_0 store (appk env () (V ...) k))
        (V_arglast store (appk env () (V_argother ...) k))
@@ -563,7 +566,8 @@
        ;; a 0-arg body then the 0-arg body is used. Otherwise an error
        ;; is raised. What I currently have rules out things like
        ;; (lambda x e e_rest ...)
-       (where {env (lambda () e e_rest ...)} V_producer)]
+       (where {env (lambda () e e_rest ...)} V_producer)
+       (where () (can-enter! e))]
 
   ;; XXX this isn't quite right in terms of top-level begin
   ;; expressions but it's enough for fibc
