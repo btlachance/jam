@@ -436,12 +436,14 @@
   [--> (V_0 (appk _ () (V ...) k))
        (e env_e (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda (x ...) e e_rest ...)} V ...) (reverse (V_0 V ...)))
-       (where env_e (env-extend env_op (x ...) (V ...)))]
+       (where env_e (env-extend env_op (x ...) (V ...)))
+       (where () (can-enter! e))]
 
   [--> (V_0 (appk _ () (V ...) k))
        (e env_e (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda x e e_rest ...)} V ...) (reverse (V_0 V ...)))
-       (where env_e (env-extend env_op (x) ((apply-op #%list (V ...)))))]
+       (where env_e (env-extend env_op (x) ((apply-op #%list (V ...)))))
+       (where () (can-enter! e))]
 
   [--> (V_0 (appk _ () (V ...) k))
        (e env_e (begink* env_e (e_rest ...) k))
@@ -449,7 +451,8 @@
        (where ((V_prefix ...) V_rest) (prefix-and-rest (x ...) (V ...)))
        (where env_e (env-extend env_op
                                 (append (x ...) (y))
-                                (append (V_prefix ...) (V_rest))))]
+                                (append (V_prefix ...) (V_rest))))
+       (where () (can-enter! e))]
 
   [--> (V_0 (appk env () (V ...) k))
        (V_arglast (appk env () (V_argother ...) k))
@@ -469,7 +472,8 @@
   [--> (V_0 (appk _ () (V ...) k))
        (e env (begink* env (e_rest ...) (cwvk V_consumer k)))
        (where (#%call-with-values V_producer V_consumer) (reverse (V_0 V ...)))
-       (where {env (lambda () e e_rest ...)} V_producer)]
+       (where {env (lambda () e e_rest ...)} V_producer)
+       (where () (can-enter! e))]
 
   [--> ((#%values V ...) (cwvk V_consumer k))
        (V_lastval (appk (env-empty) () (V ...) k))

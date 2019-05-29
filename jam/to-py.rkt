@@ -181,6 +181,7 @@
                      '((#rx"->" "_arrow_")
                        (#rx"-"  "_")
                        (#rx"\\?$" "")
+                       (#rx"!$" "")
                        (#rx"/" "")
                        (#rx"\\*" "star")
                        (#rx"=" "equal")
@@ -269,6 +270,7 @@
         'stdout 'stdout
         'stderr 'stderr
         'systemstar_json_term 'systemstar_json_term
+        'term_set_can_enter 'term_set_can_enter
         ))
 ;; A cheap way to test that this hash is partly consistent with
 ;; core.py is to generate a python module that tries to import all of

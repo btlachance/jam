@@ -43,7 +43,7 @@ def subclass_responsibility2(self, v, w):
   bail("internal: Subclass responsibility")
 
 class W_Term(object):
-  _immutable_fields_ = ['static']
+  _immutable_fields_ = ['static', '_can_enter']
 
   def is_nil(self):
     return False
@@ -68,6 +68,7 @@ class W_Term(object):
 
   def __init__(self):
     self.static = False
+    self._can_enter = False
 
   def __nonzero__(self):
     return True
@@ -115,7 +116,7 @@ class W_Term(object):
   def mark_static(self):
     self.static = True
   def can_enter(self):
-    return self.static
+    return self.static and self._can_enter
   def to_toplevel_string(self):
     return self.to_string()
 
@@ -1134,6 +1135,11 @@ def systemstar_json_term(t):
   s = f.read()
   f.close()
   return string_to_term(s)
+
+def term_set_can_enter(t):
+  [term] = [x for x in W_TermList(t)]
+  term._can_enter = True
+  return make_nil()
 
 if __name__ == "__test__":
   pytest.main([__file__, "-q"])
