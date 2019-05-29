@@ -13,6 +13,7 @@
          #:literal-sets (kernel-literals)
          [(define-syntaxes (:id ...) e) #t]
          [(#%require _ ...) #t]
+         [(begin-for-syntax _ ...) #t]
          [_ #f]))
 
      (map form->pycketlite (filter (negate drop?) (attribute forms)))]))
