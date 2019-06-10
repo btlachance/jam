@@ -59,7 +59,7 @@
              #%call-with-current-continuation)
 
   (k     ::= k1 k*)
-  (k1    ::= (appk env (e ...) (V ...) _) (ifk env e e _) (setk x env _))
+  (k1    ::= (appk env (e ...) (V ...) e _) (ifk env e e _) (setk x env _))
   ;; It's a little funky that we keep the store also in topk but it's
   ;; an artifact of how we initialize the machine. An alternative
   ;; would be an initial state like (store env (topk P)). Which gives
@@ -471,8 +471,9 @@
   [--> ((quote c) env store k)
        (c store k)]
 
-  [--> ((e e_args ...) env store k)
-       (e env store (appk env (e_args ...) () k))]
+  [--> ((name orig e) env store k)
+       (e env store (appk env (e_args ...) () orig k))
+       (where (e e_args ...) orig)]
 
   [--> ((if e_test e_then e_else) env store k)
        (e_test env store (ifk env e_then e_else k))]
@@ -513,10 +514,10 @@
        (where (loc ...) ((env-lookup env_top x) ...))
        (where () (store-extend* store (loc ...) (V ...)))]
 
-  [--> (V_0 store (appk env (e_arg e_args ...) (V ...) k))
-       (e_arg env store (appk env (e_args ...) (V_0 V ...) k))]
+  [--> (V_0 store (appk env (e_arg e_args ...) (V ...) e_orig k))
+       (e_arg env store (appk env (e_args ...) (V_0 V ...) e_orig k))]
 
-  [--> (V_0 store (appk _ () (V ...) k))
+  [--> (V_0 store (appk _ () (V ...) e_orig k))
        (e env_e store (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda (x ...) e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where (loc ...) (fresh-distinct-locations store (x ...)))
@@ -524,7 +525,7 @@
        (where () (store-extend* store (loc ...) (V ...)))
        (where () (can-enter! e))]
 
-  [--> (V_0 store (appk _ () (V ...) k))
+  [--> (V_0 store (appk _ () (V ...) e_orig k))
        (e env_e store (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda x e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where (loc) (fresh-distinct-locations store (x)))
@@ -532,7 +533,7 @@
        (where () (store-extend store loc (apply-op #%list (V ...))))
        (where () (can-enter! e))]
 
-  [--> (V_0 store (appk _ () (V ...) k))
+  [--> (V_0 store (appk _ () (V ...) e_orig k))
        (e env_e store (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda (x ...) (dot y) e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where ((V_prefix ...) V_rest) (prefix-and-rest (x ...) (V ...)))
@@ -544,22 +545,22 @@
        (where () (store-extend* store (loc ...) (append (V_prefix ...) (V_rest))))
        (where () (can-enter! e))]
 
-  [--> (V_0 store (appk env () (V ...) k))
-       (V_arglast store (appk env () (V_argother ...) k))
+  [--> (V_0 store (appk env () (V ...) e_orig k))
+       (V_arglast store (appk env () (V_argother ...) e_orig k))
        (where (#%apply V_fun V_args ...) (reverse (V ...)))
        (where #%null V_0)
        (where (V_arglast V_argother ...) (reverse (V_fun V_args ...)))]
 
-  [--> (V_0 store (appk env () (V ...) k))
-       (V_cdr store (appk env () (V_car V ...) k))
+  [--> (V_0 store (appk env () (V ...) e_orig k))
+       (V_cdr store (appk env () (V_car V ...) e_orig k))
        (where (#%apply V_fun V_args ...) (reverse (V ...)))
        (where (#%cons V_car V_cdr) V_0)]
 
-  [--> (V_0 store (appk _ () (V ...) k))
+  [--> (V_0 store (appk _ () (V ...) e_orig k))
        ((#%values V_vals ...) store k)
        (where (#%values V_vals ...) (reverse (V_0 V ...)))]
 
-  [--> (V_0 store (appk _ () (V ...) k))
+  [--> (V_0 store (appk _ () (V ...) e_orig k))
        (e env store (begink* env (e_rest ...) (cwvk V_consumer k)))
        (where (#%call-with-values V_producer V_consumer) (reverse (V_0 V ...)))
        ;; XXX This isn't exactly what Racket does; if the producer has
@@ -571,21 +572,21 @@
 
   ;; XXX this isn't quite right in terms of top-level begin
   ;; expressions but it's enough for fibc
-  [--> (V store (appk env () (#%call-with-current-continuation) k))
-       ((cont k) store (appk env () (V) k))]
+  [--> (V store (appk env () (#%call-with-current-continuation) e_orig k))
+       ((cont k) store (appk env () (V) e_orig k))]
 
-  [--> (V_0 store (appk _ () (V ...) _))
+  [--> (V_0 store (appk _ () (V ...) e_orig _))
        ((#%values V_rest ...) store k)
        (where ((cont k) V_rest ...) (reverse (V_0 V ...)))]
 
   [--> ((#%values V ...) store (cwvk V_consumer k))
-       (V_lastval store (appk (env-empty) () (V ...) k))
+       (V_lastval store (appk (env-empty) () (V ...) (quote #f) k))
        (where (V_lastval V ...) (reverse (V_consumer V ...)))]
 
-  [--> (V store (appk _ () (#%raise) k))
+  [--> (V store (appk _ () (#%raise) e_orig k))
        (topk (env-empty) store ())]
 
-  [--> (V_0 store (appk _ () (V ...) k))
+  [--> (V_0 store (appk _ () (V ...) e_orig k))
        (V_result store k)
        (where (V_op V ...) (reverse (V_0 V ...)))
        (where V_result (apply-op V_op (V ...)))]

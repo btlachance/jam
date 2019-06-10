@@ -44,7 +44,7 @@ def subclass_responsibility2(self, v, w):
   bail("internal: Subclass responsibility")
 
 class W_Term(object):
-  _immutable_fields_ = ['static', '_can_enter']
+  _immutable_fields_ = ['static', '_can_enter', '_can_enter_return']
 
   def is_nil(self):
     return False
@@ -70,6 +70,7 @@ class W_Term(object):
   def __init__(self):
     self.static = False
     self._can_enter = False
+    self._can_enter_return = False
 
   def __nonzero__(self):
     return True
@@ -117,7 +118,13 @@ class W_Term(object):
   def mark_static(self):
     self.static = True
   def can_enter(self):
+    if self._can_enter:
+      assert not self._can_enter_return
     return self.static and self._can_enter
+  def can_enter_return(self):
+    if self._can_enter_return:
+      assert not self._can_enter
+    return self.static and self._can_enter_return
   def to_toplevel_string(self):
     return self.to_string()
 
@@ -872,6 +879,8 @@ class W_SingleEnvironment(W_Environment):
 
 class W_MultipleEnvironment(W_Environment):
   _immutable_fields_ = ['xs', 'vs[*]', 'env']
+
+  @jit.unroll_safe
   def __init__(self, xs, vs, env):
     W_Environment.__init__(self)
     self.xs = xs
