@@ -269,6 +269,13 @@
         'stdout 'stdout
         'stderr 'stderr
         'systemstar_json_term 'systemstar_json_term
+        'is_location 'is_location
+        'is_store 'is_store
+        'store_init 'store_init
+        'store_fresh_location 'store_fresh_location
+        'store_extend 'store_extend
+        'store_update_location 'store_update_location
+        'store_dereference 'store_dereference
         ))
 ;; A cheap way to test that this hash is partly consistent with
 ;; core.py is to generate a python module that tries to import all of

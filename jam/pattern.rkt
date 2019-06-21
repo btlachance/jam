@@ -695,7 +695,9 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
       [(or (nt:environment pred-py-name _ _)
            (nt:mutable-sequence pred-py-name _)
            (nt:immutable-sequence pred-py-name _)
-           (nt:file pred-py-name))
+           (nt:file pred-py-name)
+           (nt:location pred-py-name)
+           (nt:store pred-py-name _ _))
        (define primary-ir
          (proc* '(t) `(call ,(internal-ref pred-py-name pred-py-name)
                             ,(lexical-var* 't))))

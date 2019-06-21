@@ -416,6 +416,8 @@
    'mutable-sequence ((curry nt:mutable-sequence) 'is_mutable_sequence)
    'immutable-sequence ((curry nt:immutable-sequence) 'is_immutable_sequence)
    'file (lambda () (nt:file 'is_file))
+   'location (lambda () (nt:location 'is_location))
+   'store ((curry nt:store) 'is_store)
    ))
 
 (define predefined-metafunctions
@@ -565,6 +567,24 @@
            (mf-name 'stderr)
            (mf:data 'get_stderr (pattern-of-ps '())))))
 
+  (define (store-metafunctions nt-name nt domain range)
+    (define (mf-name suffix) (format-symbol "~a-~a" nt-name suffix))
+    (list (metafunction
+           (mf-name 'init)
+           (mf:data 'store_init (pattern-of-ps '())))
+          (metafunction
+           (mf-name 'fresh-location)
+           (mf:data 'store_fresh_location (pattern-of-ps (list nt))))
+          (metafunction
+           (mf-name 'extend)
+           (mf:data 'store_extend (pattern-of-ps (list nt domain range))))
+          (metafunction
+           (mf-name 'update-location)
+           (mf:data 'store_update_location (pattern-of-ps (list nt domain range))))
+          (metafunction
+           (mf-name 'dereference)
+           (mf:data 'store_dereference (pattern-of-ps (list nt domain))))))
+
   (match rep
     [(nt:environment _ kp vp)
      (apply
@@ -592,4 +612,11 @@
       append
       (for/list ([nt-name nt-names]
                  [nt nts])
-        (file-metafunctions nt-name nt)))]))
+        (file-metafunctions nt-name nt)))]
+    [(nt:location _) '()]
+    [(nt:store _ dp rp)
+     (apply
+      append
+      (for/list ([nt-name nt-names]
+                 [nt nts])
+        (store-metafunctions nt-name nt dp rp)))]))

@@ -1135,6 +1135,69 @@ def systemstar_json_term(t):
   f.close()
   return string_to_term(s)
 
+class W_Location(W_Term):
+  def __init__(self):
+    W_Term.__init__(self)
+    self.contents = make_none()
+    self.index = -1
+  def to_string(self):
+    return "#%location"
+  def atoms_equal(self, other):
+    return False
+
+from rpython.rlib.rweaklist import RWeakListMixin
+class W_Store(W_Term, RWeakListMixin):
+  # I'm not certain we want to materialize a collection of the
+  # locations but holding weak references to them shouldn't hurt.
+  def __init__(self):
+    W_Term.__init__(self)
+    self.initialize()
+  def fresh_location(self):
+    return W_Location()
+  def extend(self, l, v): # only extend stores w/fresh locations
+    assert isinstance(l, W_Location)
+    assert l.index == -1
+    l.index = self.add_handle(l)
+    l.contents = v
+  def update_location(self, l, v): # only update existing locations
+    assert isinstance(l, W_Location)
+    assert l.index != -1
+    l.contents = v
+  def deref(self, l):
+    assert isinstance(l, W_Location)
+    return l.contents
+  def to_string(self):
+    return "#%store"
+  def atoms_equal(self, other):
+    return False
+
+def is_store(v):
+  return isinstance(v, W_Store)
+def is_location(v):
+  return isinstance(v, W_Location)
+
+def store_init(t):
+  [] = [t for t in W_TermList(t)]
+  return W_Store()
+@jit.unroll_safe
+def store_fresh_location(t):
+  [s] = [t for t in W_TermList(t)]
+  return s.fresh_location()
+@jit.unroll_safe
+def store_extend(t):
+  [s, l, v] = [t for t in W_TermList(t)]
+  s.extend(l, v)
+  return make_nil()
+@jit.unroll_safe
+def store_update_location(t):
+  [s, l, v] = [t for t in W_TermList(t)]
+  s.update_location(l, v)
+  return make_nil()
+@jit.unroll_safe
+def store_dereference(t):
+  [s, l] = [t for t in W_TermList(t)]
+  return s.deref(l)
+
 if __name__ == "__test__":
   pytest.main([__file__, "-q"])
 

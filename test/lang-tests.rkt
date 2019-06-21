@@ -354,3 +354,19 @@
   (test-equal (real-string 1.3) "1.3")
 
   (jam-test))
+
+(define-language store
+  #:data ([l (location)]
+          [store (store l l)]))
+(define-metafunction store
+  [(store-test store)
+   ()
+   (where l_1 (store-fresh-location store))
+   (where l_2 (store-fresh-location store))
+   (where () (store-extend store l_1 l_2))
+   (where l (store-dereference store l_1))
+   (where () (store-update-location store l_1 l_1))])
+(module+ test
+  (current-test-language store)
+  (test-equal (store-test (store-init)) ())
+  (jam-test))
