@@ -1145,13 +1145,24 @@ class W_Location(W_Term):
   def atoms_equal(self, other):
     return False
 
-from rpython.rlib.rweaklist import RWeakListMixin
-class W_Store(W_Term, RWeakListMixin):
-  # I'm not certain we want to materialize a collection of the
-  # locations but holding weak references to them shouldn't hurt.
+# I removed the weak list part of this because I was getting
+# translation errors. I added stubs for the methods I used from the
+# mixin (initialize, add_handle) so that I could try again later.
+
+# class W_Store(W_Term, RWeakListMixin):
+# # I'm not certain we want to materialize a collection of the
+# # locations but holding weak references to them shouldn't hurt.
+
+class W_Store(W_Term):
   def __init__(self):
     W_Term.__init__(self)
     self.initialize()
+
+  def initialize(self):
+    pass
+  def add_handle(self, l):
+    return 0
+
   def fresh_location(self):
     return W_Location()
   def extend(self, l, v): # only extend stores w/fresh locations
