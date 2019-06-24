@@ -271,7 +271,7 @@
         'systemstar_json_term 'systemstar_json_term
         'is_location 'is_location
         'is_store 'is_store
-        'store_init 'store_init
+        'store_empty 'store_empty
         'store_fresh_location 'store_fresh_location
         'store_extend 'store_extend
         'store_update_location 'store_update_location

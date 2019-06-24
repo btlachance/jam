@@ -230,7 +230,8 @@
      (set x)]
     [(name x _) (set x)]
     [(repeat p) (free-vars p)]
-    [(pair p lp) (set-union (free-vars p) (free-vars lp))]))
+    [(pair p lp) (set-union (free-vars p) (free-vars lp))]
+    [(mf-apply _ _ t) (free-vars t)]))
 
 (define (compile/transcribe template env)
   (define (compile/t t) (compile/transcribe t env))

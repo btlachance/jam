@@ -570,8 +570,8 @@
   (define (store-metafunctions nt-name nt domain range)
     (define (mf-name suffix) (format-symbol "~a-~a" nt-name suffix))
     (list (metafunction
-           (mf-name 'init)
-           (mf:data 'store_init (pattern-of-ps '())))
+           (mf-name 'empty)
+           (mf:data 'store_empty (pattern-of-ps '())))
           (metafunction
            (mf-name 'fresh-location)
            (mf:data 'store_fresh_location (pattern-of-ps (list nt))))

@@ -368,5 +368,5 @@
    (where () (store-update-location store l_1 l_1))])
 (module+ test
   (current-test-language store)
-  (test-equal (store-test (store-init)) ())
+  (test-equal (store-test (store-empty)) ())
   (jam-test))

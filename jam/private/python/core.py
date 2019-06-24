@@ -1176,7 +1176,7 @@ def is_store(v):
 def is_location(v):
   return isinstance(v, W_Location)
 
-def store_init(t):
+def store_empty(t):
   [] = [t for t in W_TermList(t)]
   return W_Store()
 @jit.unroll_safe
