@@ -535,7 +535,8 @@
 
   [--> (V_0 store (appk _ () (V ...) e_orig k))
        (e env_e store (begink* env_e (e_rest ...) k))
-       (where ({env_op (lambda (x ...) (dot y) e e_rest ...)} V ...) (reverse (V_0 V ...)))
+       (where ({env_op l} V ...) (reverse (V_0 V ...)))
+       (where (lambda (x ...) (dot y) e e_rest ...) l)
        (where ((V_prefix ...) V_rest) (prefix-and-rest (x ...) (V ...)))
        (where (x_args ...) (append (x ...) (y)))
        (where (loc ...) (fresh-distinct-locations store (x_args ...)))
