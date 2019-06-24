@@ -3,7 +3,9 @@
 (provide pl)
 
 (define-language pl
-  #:data ([env (environment x V)]
+  #:data ([env (environment x loc)]
+          [store (store loc V)]
+          [loc (location)]
           [mvec (mutable-sequence V)]
           [ivec (immutable-sequence V)]
           [file (file)])
@@ -20,6 +22,22 @@
 
   (x y z ::= variable-not-otherwise-mentioned)
   (c     ::= integer real boolean string (#%s string))
+
+  ;; XXX If locations aren't values, then it's tricky to implement
+  ;; things like eq? using location-equality: Since the interface to
+  ;; eq? is just like any other function, the argument expressions are
+  ;; evaluted to values. So the value for a cons would have to contain
+  ;; its location if we want eq? to be able to take a value and
+  ;; somehow know its location.
+  ;;
+  ;; Alternatively, if expressions evaluate to locations, then even
+  ;; things like an integer constant get stored in a location. That's
+  ;; consistent at least with Racket's documentation on variables and
+  ;; locations.
+  ;;
+  ;; We could also split the difference (at the cost of some
+  ;; complexity) and have certain expressions evaluate to locations
+  ;; and others evaluate just to their value.
 
   (V     ::= {env l} c mvec ivec file
              #%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%= #%<
@@ -39,7 +57,12 @@
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
-  (k*    ::= (topk env P) (defk (x ...) env P) (cwvk V k)
+
+  ;; It's a little funky that we keep the store also in topk but it's
+  ;; an artifact of how we initialize the machine. An alternative
+  ;; would be an initial state like (store env (topk P)). Which gives
+  ;; me an idea that defk could be changed to (defk (x ...) P)
+  (k*    ::= (topk env store P) (defk (x ...) env P) (cwvk V k)
 
              ;; env               environment for remaining RHS
              ;; (x ...)           variables the current RHS results will be bound to
@@ -64,13 +87,10 @@
   (current-test-language pl))
 
 (define-metafunction pl
-  [(init-env (x_toplevel ...))
-   env
-
-   (where env (env-empty))
-   (where env (env-extend
-               env
-               (  +   -   *   zero?   exact-integer?   inexact?   =   <
+  [(init-env-store (x_toplevel ...))
+   (env store)
+   (where ((x ...) (V ...))
+              ((  +   -   *   zero?   exact-integer?   inexact?   =   <
                   inexact->exact   exact->inexact   number?
                   cons   null   car   cdr   null?   pair?   list
                   apply   void   values   call-with-values
@@ -98,7 +118,12 @@
                 #%number->string
                 #%symbol? #%symbol=? #%symbol->string
                 #%current-inexact-milliseconds)))
-   (where env (env-extend-cells env (x_toplevel ...)))])
+   (where store (store-empty))
+   (where (loc ...) (fresh-distinct-locations store (x ...)))
+   (where env (env-extend (env-empty) (x ...) (loc ...)))
+   (where () (store-extend* store (loc ...) (V ...)))
+   (where (loc ...) (fresh-distinct-locations store (x_toplevel ...)))
+   (where env (env-extend env (x_toplevel ...) (loc ...)))])
 
 (define-metafunction pl
   [(toplevel-names ())
@@ -373,163 +398,193 @@
   [(begink* env () k) k]
   [(begink* env (e e_rest ...) k) (begink env (e e_rest ...) k)])
 
+(define-metafunction pl
+  [(fresh-distinct-locations store ()) ()]
+  [(fresh-distinct-locations store ((name _1 _) (name _2 _) ...))
+   ((store-fresh-location store) loc ...)
+   (where (loc ...) (fresh-distinct-locations store (_2 ...)))])
+
+(define-metafunction pl
+  [(store-extend* store () ()) ()]
+  [(store-extend* store (loc loc_rest ...) (V V_rest ...))
+   (store-extend* store (loc_rest ...) (V_rest ...))
+   (where () (store-extend store loc V))])
+
 (define-transition pl
   step
-  [--> (topk env (t t_rest ...))
-       (t (topk env (t_rest ...)))]
+  [--> (topk env store (t t_rest ...))
+       (t (topk env store (t_rest ...)))]
 
-  [--> (e (topk env P))
-       (e env (topk env P))]
+  [--> (e (topk env store P))
+       (e env store (topk env store P))]
 
-  [--> ((define-values (x ...) e) (topk env P))
-       (e env (defk (x ...) env P))]
+  [--> ((define-values (x ...) e) (topk env store P))
+       (e env store (defk (x ...) env P))]
 
-  [--> (x env k)
-       (V k)
-       (where V (env-lookup env x))]
+  [--> (x env store k)
+       (V store k)
+       (where V (store-dereference store (env-lookup env x)))]
 
-  [--> (l env k)
-       ({env l} k)]
+  [--> (l env store k)
+       ({env l} store k)]
 
-  [--> ((quote c) env k)
-       (c k)]
+  [--> ((quote c) env store k)
+       (c store k)]
 
-  [--> ((e e_args ...) env k)
-       (e env (appk env (e_args ...) () k))]
+  [--> ((e e_args ...) env store k)
+       (e env store (appk env (e_args ...) () k))]
 
-  [--> ((if e_test e_then e_else) env k)
-       (e_test env (ifk env e_then e_else k))]
+  [--> ((if e_test e_then e_else) env store k)
+       (e_test env store (ifk env e_then e_else k))]
 
-  [--> ((let-values () e e_rest ...) env k)
-       (e env (begink* env (e_rest ...) k))]
+  [--> ((let-values () e e_rest ...) env store k)
+       (e env store (begink* env (e_rest ...) k))]
 
-  [--> ((let-values ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) e_body ...) env k)
-       (e_first env (letk env (x_first ...) ([(x_rest ...) e_rest] ...)
-                          () (e_body ...) k))]
+  [--> ((let-values ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) e_body ...) env store k)
+       (e_first env store (letk env (x_first ...) ([(x_rest ...) e_rest] ...)
+                                () (e_body ...) k))]
 
-  [--> ((letrec-values () e e_rest ...) env k)
-       (e env (begink* env (e_rest ...) k))]
+  [--> ((letrec-values () e e_rest ...) env store k)
+       (e env store (begink* env (e_rest ...) k))]
 
-  [--> ((letrec-values ([(x ...) e] ...) e_body ...) env k)
-       (e_first env_rec (letreck env_rec (x_first ...) ([(x_rest ...) e_rest] ...) (e_body ...) k))
+  [--> ((letrec-values ([(x ...) e] ...) e_body ...) env store k)
+       (e_first env_rec store (letreck env_rec (x_first ...) ([(x_rest ...) e_rest] ...) (e_body ...) k))
        (where ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) ([(x ...) e] ...))
-       (where env_rec (env-extend-cells env (flatten-vars ((x ...) ...))))]
+       (where (x_vars ...) (flatten-vars ((x ...) ...)))
+       (where (loc ...) (fresh-distinct-locations store (x_vars ...)))
+       (where env_rec (env-extend env (x_vars ...) (loc ...)))]
 
-  [--> ((begin e e_rest ...) env k)
-       (e env (begink* env (e_rest ...) k))]
+  [--> ((begin e e_rest ...) env store k)
+       (e env store (begink* env (e_rest ...) k))]
 
-  [--> (V k*)
-       ((#%values V) k*)]
-  [--> ((#%values V) k1)
-       (V k1)]
+  [--> (V store k*)
+       ((#%values V) store k*)]
+  [--> ((#%values V) store k1)
+       (V store k1)]
 
-  [--> ((#%values V ...) (topk env_top P))
-       (topk env_top P)]
+  [--> ((#%values V ...) store (topk env_top _ P))
+       (topk env_top store P)]
 
-  [--> ((#%values V ...) (defk (x ...) env_top P))
-       (topk env_top P)
-       (where () (env-set-cells env_top (x ...) (V ...)))]
+  [--> ((#%values V ...) store (defk (x ...) env_top P))
+       (topk env_top store P)
+       (where (loc ...) ((env-lookup env_top x) ...))
+       (where () (store-extend* store (loc ...) (V ...)))]
 
-  [--> (V_0 (appk env (e_arg e_args ...) (V ...) k))
-       (e_arg env (appk env (e_args ...) (V_0 V ...) k))]
+  [--> (V_0 store (appk env (e_arg e_args ...) (V ...) k))
+       (e_arg env store (appk env (e_args ...) (V_0 V ...) k))]
 
-  [--> (V_0 (appk _ () (V ...) k))
-       (e env_e (begink* env_e (e_rest ...) k))
+  [--> (V_0 store (appk _ () (V ...) k))
+       (e env_e store (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda (x ...) e e_rest ...)} V ...) (reverse (V_0 V ...)))
-       (where env_e (env-extend env_op (x ...) (V ...)))]
+       (where (loc ...) (fresh-distinct-locations store (x ...)))
+       (where env_e (env-extend env_op (x ...) (loc ...)))
+       (where () (store-extend* store (loc ...) (V ...)))]
 
-  [--> (V_0 (appk _ () (V ...) k))
-       (e env_e (begink* env_e (e_rest ...) k))
+  [--> (V_0 store (appk _ () (V ...) k))
+       (e env_e store (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda x e e_rest ...)} V ...) (reverse (V_0 V ...)))
-       (where env_e (env-extend env_op (x) ((apply-op #%list (V ...)))))]
+       (where (loc) (fresh-distinct-locations store (x)))
+       (where env_e (env-extend env_op (x) (loc)))
+       (where () (store-extend store loc (apply-op #%list (V ...))))]
 
-  [--> (V_0 (appk _ () (V ...) k))
-       (e env_e (begink* env_e (e_rest ...) k))
+  [--> (V_0 store (appk _ () (V ...) k))
+       (e env_e store (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda (x ...) (dot y) e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where ((V_prefix ...) V_rest) (prefix-and-rest (x ...) (V ...)))
+       (where (loc ...) (fresh-distinct-locations store (append (x ...) (y))))
        (where env_e (env-extend env_op
                                 (append (x ...) (y))
-                                (append (V_prefix ...) (V_rest))))]
+                                (loc ...)))
+       (where () (store-extend* store (loc ...) (append (V_prefix ...) (V_rest))))]
 
-  [--> (V_0 (appk env () (V ...) k))
-       (V_arglast (appk env () (V_argother ...) k))
+  [--> (V_0 store (appk env () (V ...) k))
+       (V_arglast store (appk env () (V_argother ...) k))
        (where (#%apply V_fun V_args ...) (reverse (V ...)))
        (where #%null V_0)
        (where (V_arglast V_argother ...) (reverse (V_fun V_args ...)))]
 
-  [--> (V_0 (appk env () (V ...) k))
-       (V_cdr (appk env () (V_car V ...) k))
+  [--> (V_0 store (appk env () (V ...) k))
+       (V_cdr store (appk env () (V_car V ...) k))
        (where (#%apply V_fun V_args ...) (reverse (V ...)))
        (where (#%cons V_car V_cdr) V_0)]
 
-  [--> (V_0 (appk _ () (V ...) k))
-       ((#%values V_vals ...) k)
+  [--> (V_0 store (appk _ () (V ...) k))
+       ((#%values V_vals ...) store k)
        (where (#%values V_vals ...) (reverse (V_0 V ...)))]
 
-  [--> (V_0 (appk _ () (V ...) k))
-       (e env (begink* env (e_rest ...) (cwvk V_consumer k)))
+  [--> (V_0 store (appk _ () (V ...) k))
+       (e env store (begink* env (e_rest ...) (cwvk V_consumer k)))
        (where (#%call-with-values V_producer V_consumer) (reverse (V_0 V ...)))
+       ;; XXX This isn't exactly what Racket does; if the producer has
+       ;; a 0-arg body then the 0-arg body is used. Otherwise an error
+       ;; is raised. What I currently have rules out things like
+       ;; (lambda x e e_rest ...)
        (where {env (lambda () e e_rest ...)} V_producer)]
 
-  [--> ((#%values V ...) (cwvk V_consumer k))
-       (V_lastval (appk (env-empty) () (V ...) k))
+  [--> ((#%values V ...) store (cwvk V_consumer k))
+       (V_lastval store (appk (env-empty) () (V ...) k))
        (where (V_lastval V ...) (reverse (V_consumer V ...)))]
 
-  [--> (V (appk _ () (#%raise) k))
-       (topk (env-empty) ())]
+  [--> (V store (appk _ () (#%raise) k))
+       (topk (env-empty) store ())]
 
-  [--> (V_0 (appk _ () (V ...) k))
-       (V_result k)
+  [--> (V_0 store (appk _ () (V ...) k))
+       (V_result store k)
        (where (V_op V ...) (reverse (V_0 V ...)))
        (where V_result (apply-op V_op (V ...)))]
 
-  [--> ((#%values V_new ...) (letk env_e (x_new ...) ([(x ...) e] [(x_rest ...) e_rest] ...)
-                                   (name sofar _) (e_body ...) k))
-       (e env_e (letk env_e (x ...) ([(x_rest ...) e_rest] ...)
-                      (append ((x_new V_new) ...) ((x_sofar V_sofar) ...))
-                      (e_body ...) k))
+  [--> ((#%values V_new ...) store (letk env_e (x_new ...) ([(x ...) e] [(x_rest ...) e_rest] ...)
+                                         (name sofar _) (e_body ...) k))
+       (e env_e store (letk env_e (x ...) ([(x_rest ...) e_rest] ...)
+                            (append ((x_new V_new) ...) ((x_sofar V_sofar) ...))
+                            (e_body ...) k))
        (where ((x_sofar V_sofar) ...) sofar)]
 
-  [--> ((#%values V_new ...) (letk env (x_new ...) ()
-                                   ((x_sofar V_sofar) ...) (e e_rest ...) k))
-       (e env_body (begink* env_body (e_rest ...) k))
+  [--> ((#%values V_new ...) store (letk env (x_new ...) ()
+                                         ((x_sofar V_sofar) ...) (e e_rest ...) k))
+       (e env_body store (begink* env_body (e_rest ...) k))
+       (where (loc ...) (fresh-distinct-locations store (append (x_new ...) (x_sofar ...))))
        (where env_body (env-extend env
                                    (append (x_new ...) (x_sofar ...))
-                                   (append (V_new ...) (V_sofar ...))))]
+                                   (loc ...)))
+       (where () (store-extend* store (loc ...) (append (V_new ...) (V_sofar ...))))]
 
-  [--> ((#%values V_new ...) (letreck env_rec (x_new ...)
-                                      ([(x ...) e] [(x_rest ...) e_rest] ...)
-                                      (e_body ...) k))
-       (e env_rec (letreck env_rec (x ...)
-                         ([(x_rest ...) e_rest] ...)
-                         (e_body ...) k))
-       (where () (env-set-cells env_rec (x_new ...) (V_new ...)))]
+  [--> ((#%values V_new ...) store (letreck env_rec (x_new ...)
+                                            ([(x ...) e] [(x_rest ...) e_rest] ...)
+                                            (e_body ...) k))
+       (e env_rec store (letreck env_rec (x ...)
+                                 ([(x_rest ...) e_rest] ...)
+                                 (e_body ...) k))
+       (where (loc ...) ((env-lookup env_rec x_new) ...))
+       (where () (store-extend* store (loc ...) (V_new ...)))]
 
-  [--> ((#%values V_new ...) (letreck env_rec (x_new ...) () (e e_rest ...) k))
-       (e env_rec (begink* env_rec (e_rest ...) k))
-       (where () (env-set-cells env_rec (x_new ...) (V_new ...)))]
+  [--> ((#%values V_new ...) store (letreck env_rec (x_new ...) () (e e_rest ...) k))
+       (e env_rec store (begink* env_rec (e_rest ...) k))
+       (where (loc ...) ((env-lookup env_rec x_new) ...))
+       (where () (store-extend* store (loc ...) (V_new ...)))]
 
-  [--> ((#%values V ...) (begink env (e e_rest ...) k))
-       (e env (begink* env (e_rest ...) k))]
+  [--> ((#%values V ...) store (begink env (e e_rest ...) k))
+       (e env store (begink* env (e_rest ...) k))]
 
-  [--> (#f (ifk env _ e_else k))
-       (e_else env k)]
+  [--> (#f store (ifk env _ e_else k))
+       (e_else env store k)]
 
-  [--> (V (ifk env e_then _ k))
-       (e_then env k)])
+  [--> (V store (ifk env e_then _ k))
+       (e_then env store k)])
 
 (define-evaluator pl
   eval
 
-  #:load [--> P_user (topk (init-env (toplevel-names P)) P)
+  #:load [--> P_user (topk env_init store_init P)
               (where P_predef (load-pl "/Users/blachance/projects/jam/examples/racket/predefined.rkt"))
-              (where P (append P_predef P_user))]
+              (where P (append P_predef P_user))
+              (where (env_init store_init) (init-env-store (toplevel-names P)))]
 
-  #:unload [--> (topk _ ()) ()] ;; XXX maybe call an exit metafunction
+  #:unload [--> (topk _ _ ()) ()] ;; XXX maybe call an exit metafunction
                                 ;; here, indicating a succesful
                                 ;; termination?
   #:transition step
-  #:control-string [(e _ _) e])
+  #:control-string [(e _ _ _) e])
 
 (define-metafunction pl
   [(unload {env l}) l]
@@ -544,10 +599,11 @@
 (define-evaluator pl
   eval-e
 
-  #:load [--> e (topk (init-env ()) (e))]
-  #:unload [--> ((#%values V) (topk _ ())) (unload V)]
+  #:load [--> e (topk env_init store_init (e))
+              (where (env_init store_init) (init-env-store ()))]
+  #:unload [--> ((#%values V) _ (topk _ _ ())) (unload V)]
   #:transition step
-  #:control-string [(e _ _) e])
+  #:control-string [(e _ _ _) e])
 
 (module+ test
   (test-equal (run-eval-e '5) 5)
