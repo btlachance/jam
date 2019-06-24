@@ -491,9 +491,10 @@
        (e env_e store (begink* env_e (e_rest ...) k))
        (where ({env_op (lambda (x ...) (dot y) e e_rest ...)} V ...) (reverse (V_0 V ...)))
        (where ((V_prefix ...) V_rest) (prefix-and-rest (x ...) (V ...)))
-       (where (loc ...) (fresh-distinct-locations store (append (x ...) (y))))
+       (where (x_args ...) (append (x ...) (y)))
+       (where (loc ...) (fresh-distinct-locations store (x_args ...)))
        (where env_e (env-extend env_op
-                                (append (x ...) (y))
+                                (x_args ...)
                                 (loc ...)))
        (where () (store-extend* store (loc ...) (append (V_prefix ...) (V_rest))))]
 
@@ -533,11 +534,12 @@
        (where (V_op V ...) (reverse (V_0 V ...)))
        (where V_result (apply-op V_op (V ...)))]
 
-  [--> ((#%values V_new ...) store (letk env_e (x_new ...) ([(x ...) e] [(x_rest ...) e_rest] ...)
+  [--> ((#%values V_new ...) store (letk env_e (x_new ...) (name remaining _)
                                          (name sofar _) (e_body ...) k))
        (e env_e store (letk env_e (x ...) ([(x_rest ...) e_rest] ...)
                             (append ((x_new V_new) ...) ((x_sofar V_sofar) ...))
                             (e_body ...) k))
+       (where ([(x ...) e] [(x_rest ...) e_rest] ...) remaining)
        (where ((x_sofar V_sofar) ...) sofar)]
 
   [--> ((#%values V_new ...) store (letk env (x_new ...) ()
@@ -550,11 +552,12 @@
        (where () (store-extend* store (loc ...) (append (V_new ...) (V_sofar ...))))]
 
   [--> ((#%values V_new ...) store (letreck env_rec (x_new ...)
-                                            ([(x ...) e] [(x_rest ...) e_rest] ...)
+                                            (name remaining _)
                                             (e_body ...) k))
        (e env_rec store (letreck env_rec (x ...)
                                  ([(x_rest ...) e_rest] ...)
                                  (e_body ...) k))
+       (where ([(x ...) e] [(x_rest ...) e_rest] ...) remaining)
        (where (loc ...) ((env-lookup env_rec x_new) ...))
        (where () (store-extend* store (loc ...) (V_new ...)))]
 
