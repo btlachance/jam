@@ -70,7 +70,9 @@
     [(#%plain-app e e* ...)
      (cons (expr->pycketlite #'e) (map expr->pycketlite (attribute e*)))]
 
-    [x:id (syntax-e #'x)]))
+    [x:id (syntax-e #'x)]
+
+    [(set! x e) `(set! ,(syntax-e #'x) ,(expr->pycketlite #'e))]))
 
 (define (path->pycketlite p [ns? #t])
   ;; XXX I don't fully understand why, but when calling this

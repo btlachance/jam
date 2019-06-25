@@ -15,7 +15,8 @@
   (e     ::= x l (quote c) (e e ...) (if e e e)
              (let-values ([(x ...) e] ...) e e ...)
              (letrec-values ([(x ...) e] ...) e e ...)
-             (begin e e ...))
+             (begin e e ...)
+             (set! x e))
   (l     ::= (lambda (x ...) e e ...)
              (lambda x e e ...)
              (lambda (x ...) (dot x) e e ...))
@@ -56,7 +57,7 @@
              #%current-inexact-milliseconds)
 
   (k     ::= k1 k*)
-  (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k))
+  (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k) (setk x env k))
 
   ;; It's a little funky that we keep the store also in topk but it's
   ;; an artifact of how we initialize the machine. An alternative
@@ -457,6 +458,9 @@
   [--> ((begin e e_rest ...) env store k)
        (e env store (begink* env (e_rest ...) k))]
 
+  [--> ((set! x e) env store k)
+       (e env store (setk x env k))]
+
   [--> (V store k*)
        ((#%values V) store k*)]
   [--> ((#%values V) store k1)
@@ -573,7 +577,12 @@
        (e_else env store k)]
 
   [--> (V store (ifk env e_then _ k))
-       (e_then env store k)])
+       (e_then env store k)]
+
+  [--> (V store (setk x env k))
+       (#%void store k)
+       (where loc (env-lookup env x))
+       (where () (store-update-location store loc V))])
 
 (define-evaluator pl
   eval
@@ -818,6 +827,28 @@
                 (raise '#f)
                 ((lambda (x) (x x)) (lambda (x) (x x)))))
               ())
+
+  (test-equal (run-eval-e (let-values ([(x) '0])
+                            (if (< x '0)
+                                (begin
+                                  (set! x (+ x '1))
+                                  x)
+                                x)))
+                          0)
+  (test-equal (run-eval-e (let-values ([(x) '0])
+                            (set! x (+ '1 x))
+                            (set! x (+ '1 x))
+                            x))
+              2)
+  (test-equal (run-eval-e (let-values ([(x) '0])
+                            (let-values ([(inc)
+                                          (lambda ()
+                                            (set! x (+ '1 x))
+                                            x)])
+                              (inc)
+                              (inc)
+                              (inc))))
+              3)
 
   (jam-test))
 
