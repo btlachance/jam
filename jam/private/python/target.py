@@ -1,7 +1,10 @@
 import core
+import sys
 from main import main
 from rpython.rlib import jit
 from rpython.rlib.objectmodel import we_are_translated
+
+sys.setrecursionlimit(10000)
 
 def entry_point(argv):
   # Pycket's params

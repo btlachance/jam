@@ -16,7 +16,65 @@
          [(begin-for-syntax _ ...) #t]
          [_ #f]))
 
-     (map form->pycketlite (filter (negate drop?) (attribute forms)))]))
+     (define forms/only-simple-quote
+       (for/lists (quote-defns forms #:result (append (apply append quote-defns)
+                                                      forms))
+                  ([form (filter (negate drop?) (attribute forms))])
+
+         (define-values (form* ids+quotes) (lift-complex-quotes form))
+
+         (values
+          (for/list ([id+q ids+quotes])
+            (match-define (list id q) id+q)
+            #`(define-values (#,id) #,(simplify-complex-quote q)))
+          form*)))
+
+     (map form->pycketlite forms/only-simple-quote)]))
+
+;; lift-complex-quotes : stx -> (values stx (list (list symbol stx)))
+(define (lift-complex-quotes e)
+  (syntax-parse e
+    #:literal-sets (kernel-literals)
+    [x:id (values e '())]
+
+    [() (values e '())]
+
+    [(quote v)
+     (match (syntax-e #'v)
+       [(? vector? v)
+        (define tmp (gensym 'quote-vec))
+        (values (datum->syntax e tmp e) (list (list tmp e)))]
+
+       [(? list? v)
+        (define tmp (gensym 'quote-list))
+        (values (datum->syntax e tmp e) (list (list tmp e)))]
+
+       [(? datum?) (values e '())])]
+
+    [(hd . rest)
+     (define-values (hd* hd*-quotes) (lift-complex-quotes #'hd))
+     (define-values (rest* rest*-quotes) (lift-complex-quotes #'rest))
+
+     (values (quasisyntax/loc e (#,hd* . #,rest*))
+             (append hd*-quotes rest*-quotes))]))
+
+(define (simplify-complex-quote q)
+  (define (reflect v)
+    (match v
+      [(? vector?)
+       #`(#%plain-app
+          vector-immutable
+          #,@(for/list ([sub (in-vector v)]) (reflect sub)))]
+
+      [(? null?) #'null]
+
+      [(? list?)
+       #`(#%plain-app
+          list
+          #,@(for/list ([sub (in-list v)]) (reflect sub)))]
+      [(? datum?) #`(quote #,v)]))
+
+  (reflect (syntax->datum (cadr (syntax-e q)))))
 
 (define (form->pycketlite f)
   (syntax-parse f
