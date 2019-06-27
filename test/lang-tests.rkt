@@ -331,6 +331,13 @@
   (test-equal (real-subtract 5.0 4.0) 1.0)
   (test-equal (add 1.0 1.0) 2.0)
   (test-not-equal 0.0 0.1)
+  (test-equal (integer-divide 4 2) 2)
+  (test-equal (integer-divide 3 2) 1)
+  (test-equal (integer-divmod 14 3) (4 2))
+  (test-equal (real-divide 8.0 4.0) 2.0)
+  (test-equal (real-divide 3.0 2.0) 1.5)
+  (test-equal (real-divmod 7.0 2.0) (3.0 1.0))
+  (test-equal (real-sin 0.0) 0.0)
 
   (test-equal (integer->real 1) 1.0)
   (test-equal (real->integer 0.0) 0)

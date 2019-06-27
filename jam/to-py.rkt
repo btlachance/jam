@@ -238,9 +238,14 @@
         'integer_add0 'integer_add0
         'integer_subtract0 'integer_subtract0
         'integer_multiply0 'integer_multiply0
+        'integer_divide 'integer_divide
+        'integer_divmod 'integer_divmod
         'real_add 'real_add
         'real_subtract 'real_subtract
         'real_multiply 'real_multiply
+        'real_divide 'real_divide
+        'real_divmod 'real_divmod
+        'real_sin 'real_sin
         'is_environment 'is_environment
         'environment_lookup 'environment_lookup
         'environment_is_bound 'environment_is_bound

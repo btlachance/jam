@@ -435,6 +435,12 @@
    (metafunction
     'integer-multiply
     (mf:data 'integer_multiply0 (pattern-of-ps (list integer-pattern integer-pattern))))
+   (metafunction
+    'integer-divide
+    (mf:data 'integer_divide (pattern-of-ps (list integer-pattern integer-pattern))))
+   (metafunction
+    'integer-divmod
+    (mf:data 'integer_divmod (pattern-of-ps (list integer-pattern integer-pattern))))
 
    (metafunction
     'real-add
@@ -445,6 +451,15 @@
    (metafunction
     'real-multiply
     (mf:data 'real_multiply (pattern-of-ps (list real-pattern real-pattern))))
+   (metafunction
+    'real-divide
+    (mf:data 'real_divide (pattern-of-ps (list real-pattern real-pattern))))
+   (metafunction
+    'real-divmod
+    (mf:data 'real_divmod (pattern-of-ps (list real-pattern real-pattern))))
+   (metafunction
+    'real-sin
+    (mf:data 'real_sin (pattern-of-ps (list real-pattern))))
 
    (metafunction
     'real->integer

@@ -24,6 +24,7 @@ if 'JAM_QUIET_RPYTHON' in os.environ:
 
 import time
 import pytest
+import math
 from rpython.rlib import jit
 from rpython.rlib.objectmodel import we_are_translated, specialize
 
@@ -249,6 +250,25 @@ class W_Integer(W_Term):
   def multiply_same(self, other):
     return W_Integer(self.n * other.n)
 
+  def divide(self, other):
+    if not isinstance(other, W_Integer):
+      bail("divide: not two integers")
+    return self.divide_same(other)
+  def divide_same(self, other):
+    if other.n == 0:
+      bail("divide: division by integer 0")
+    return W_Integer(self.n / other.n)
+
+  def divmod(self, other):
+    if not isinstance(other, W_Integer):
+      bail("divmod: not two integers")
+    return self.divmod_same(other)
+  def divmod_same(self, other):
+    if other.n == 0:
+      bail("divide: division by integer 0")
+    q, r = divmod(self.n, other.n)
+    return W_Integer(q), W_Integer(r)
+
 class W_Real(W_Term):
   _immutable_fields_ = ['n']
   def __init__(self, n):
@@ -286,6 +306,28 @@ class W_Real(W_Term):
   def multiply_same(self, other):
     return W_Real(self.n * other.n)
 
+  def divide(self, other):
+    if not isinstance(other, W_Real):
+      bail("multiply: not two reals")
+    return self.divide_same(other)
+  def divide_same(self, other):
+    if other.n == 0.0:
+      bail("divide: division by real 0")
+    return W_Real(self.n / other.n)
+
+  def divmod(self, other):
+    if not isinstance(other, W_Real):
+      bail("divmod: not two reals")
+    return self.divmod_same(other)
+  def divmod_same(self, other):
+    if other.n == 0.0:
+      bail("divmod: division by real 0")
+    q, r = divmod(self.n, other.n)
+    return W_Real(q), W_Real(r)
+
+  def sin(self):
+    return W_Real(math.sin(self.n))
+
 @jit.unroll_safe
 def integer_add0(t):
   [v1, v2] = [v for v in W_TermList(t)]
@@ -300,6 +342,17 @@ def integer_subtract0(t):
 def integer_multiply0(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return v1.multiply(v2)
+
+@jit.unroll_safe
+def integer_divide(t):
+  [v1, v2] = [v for v in W_TermList(t)]
+  return v1.divide(v2)
+
+@jit.unroll_safe
+def integer_divmod(t):
+  [v1, v2] = [v for v in W_TermList(t)]
+  q, r = v1.divmod(v2)
+  return term_list([q, r])
 
 def integer_equal(t):
   [v1, v2] = [v for v in W_TermList(t)]
@@ -325,6 +378,17 @@ def real_multiply(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return v1.multiply(v2)
 
+@jit.unroll_safe
+def real_divide(t):
+  [v1, v2] = [v for v in W_TermList(t)]
+  return v1.divide(v2)
+
+@jit.unroll_safe
+def real_divmod(t):
+  [v1, v2] = [v for v in W_TermList(t)]
+  q, r = v1.divmod(v2)
+  return term_list([q, r])
+
 def real_equal(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return make_boolean(v1.atoms_equal(v2))
@@ -348,6 +412,11 @@ def integer_string(t):
 def real_string(t):
   [r] = [v for v in W_TermList(t)]
   return make_string(r.to_toplevel_string())
+
+@jit.unroll_safe
+def real_sin(t):
+  [r] = [v for v in W_TermList(t)]
+  return r.sin()
 
 def string_append(t):
   [s1, s2] = [x for x in W_TermList(t)]
