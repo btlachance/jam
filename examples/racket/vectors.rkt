@@ -21,3 +21,7 @@
 (define v (vector #t))
 (vector-set! v 0 123)
 (vector-ref v 0)
+
+(define zeros (make-vector 10 0))
+(vector-set! zeros 0 10)
+zeros

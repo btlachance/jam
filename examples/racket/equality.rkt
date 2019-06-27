@@ -11,3 +11,6 @@
 (equal? 'a 'a)
 (equal? 'a 'b)
 
+(equal? (vector) (vector))
+(equal? (vector 1) (vector 1))
+(not (equal? (vector 1) (vector 2)))

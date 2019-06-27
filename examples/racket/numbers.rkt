@@ -42,5 +42,18 @@
 (< 5 4.0)
 (< 4.0 10)
 
+(/ 10 5)
+(/ 10.0 5.0)
+
 (number->string 100)
 (number->string 4.0)
+
+(sin 0.0)
+(quotient 10 2)
+(quotient 10.0 2.0)
+(quotient 10 3)
+(remainder 10 2)
+(remainder 10.0 2.0)
+(remainder 10 3)
+
+(inexact? 1e-6)

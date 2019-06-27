@@ -41,8 +41,9 @@
   ;; and others evaluate just to their value.
 
   (V     ::= {env l} c mvec ivec file
-             #%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%= #%<
+             #%+ #%- #%* #%/ #%zero? #%exact-integer? #%inexact? #%= #%<
              #%inexact->exact #%exact->inexact #%number?
+             #%sin #%quotient #%remainder
              (#%cons V V) #%null #%cons #%car #%cdr #%null? #%pair? #%list
              #%apply #%void #%values #%call-with-values
              #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
@@ -91,8 +92,9 @@
   [(init-env-store (x_toplevel ...))
    (env store)
    (where ((x ...) (V ...))
-              ((  +   -   *   zero?   exact-integer?   inexact?   =   <
+              ((  +   -   *   /   zero?   exact-integer?   inexact?   =   <
                   inexact->exact   exact->inexact   number?
+                  sin   quotient   remainder
                   cons   null   car   cdr   null?   pair?   list
                   apply   void   values   call-with-values
                   vector   vector-immutable   vector-ref   vector-length   vector-set!
@@ -105,8 +107,9 @@
                   number->string
                   symbol?   symbol=?   symbol->string
                   current-inexact-milliseconds)
-               (#%+ #%- #%* #%zero? #%exact-integer? #%inexact? #%= #%<
+               (#%+ #%- #%* #%/ #%zero? #%exact-integer? #%inexact? #%= #%<
                 #%inexact->exact #%exact->inexact #%number?
+                #%sin #%quotient #%remainder
                 #%cons #%null #%car #%cdr #%null? #%pair? #%list
                 #%apply #%void #%values #%call-with-values
                 #%vector #%vector-immutable #%vector-ref #%vector-length #%vector-set!
@@ -178,6 +181,10 @@
   [(apply-op #%* (integer_1 integer_2))
    (integer-multiply integer_1 integer_2)]
 
+  ;; XXX Really need rationals here
+  [(apply-op #%/ (integer_1 integer_2))
+   (integer-divide integer_1 integer_2)]
+
   [(apply-op #%+ (real_1 real_2))
    (real-add real_1 real_2)]
 
@@ -186,6 +193,9 @@
 
   [(apply-op #%* (real_1 real_2))
    (real-multiply real_1 real_2)]
+
+  [(apply-op #%/ (real_1 real_2))
+   (real-divide real_1 real_2)]
 
   [(apply-op #%exact-integer? (integer))
    #t]
@@ -263,6 +273,32 @@
 
   [(apply-op #%inexact->exact (integer))
    integer]
+
+  [(apply-op #%sin (real))
+   (real-sin real)]
+
+  [(apply-op #%sin (integer))
+   0
+   (where 0 integer)]
+
+  [(apply-op #%sin (integer))
+   (real-sin (integer->real integer))]
+
+  [(apply-op #%quotient (integer_1 integer_2))
+   integer_q
+   (where (integer_q _) (integer-divmod integer_1 integer_2))]
+
+  [(apply-op #%remainder (integer_1 integer_2))
+   integer_r
+   (where (_ integer_r) (integer-divmod integer_1 integer_2))]
+
+  [(apply-op #%quotient (real_1 real_2))
+   real_q
+   (where (real_q _) (real-divmod real_1 real_2))]
+
+  [(apply-op #%remainder (real_1 real_2))
+   real_r
+   (where (_ real_r) (real-divmod real_1 real_2))]
 
   [(apply-op #%cons (V_1 V_2))
    (#%cons V_1 V_2)]
