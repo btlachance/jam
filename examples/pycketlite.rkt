@@ -40,7 +40,7 @@
   ;; complexity) and have certain expressions evaluate to locations
   ;; and others evaluate just to their value.
 
-  (V     ::= {env l} c mvec ivec file
+  (V     ::= {env l} c mvec ivec file (cont k)
              #%+ #%- #%* #%/ #%zero? #%exact-integer? #%inexact? #%= #%<
              #%inexact->exact #%exact->inexact #%number?
              #%sin #%quotient #%remainder
@@ -55,7 +55,8 @@
              #%write-string #%current-output-port #%current-error-port
              #%number->string
              #%symbol? #%symbol=? #%symbol->string
-             #%current-inexact-milliseconds)
+             #%current-inexact-milliseconds
+             #%call-with-current-continuation)
 
   (k     ::= k1 k*)
   (k1    ::= (appk env (e ...) (V ...) k) (ifk env e e k) (setk x env k))
@@ -106,7 +107,8 @@
                   write-string   current-output-port   current-error-port
                   number->string
                   symbol?   symbol=?   symbol->string
-                  current-inexact-milliseconds)
+                  current-inexact-milliseconds
+                  call-with-current-continuation)
                (#%+ #%- #%* #%/ #%zero? #%exact-integer? #%inexact? #%= #%<
                 #%inexact->exact #%exact->inexact #%number?
                 #%sin #%quotient #%remainder
@@ -121,7 +123,8 @@
                 #%write-string #%current-output-port #%current-error-port
                 #%number->string
                 #%symbol? #%symbol=? #%symbol->string
-                #%current-inexact-milliseconds)))
+                #%current-inexact-milliseconds
+                #%call-with-current-continuation)))
    (where store (store-empty))
    (where (loc ...) (fresh-distinct-locations store (x ...)))
    (where env (env-extend (env-empty) (x ...) (loc ...)))
@@ -562,6 +565,15 @@
        ;; (lambda x e e_rest ...)
        (where {env (lambda () e e_rest ...)} V_producer)]
 
+  ;; XXX this isn't quite right in terms of top-level begin
+  ;; expressions but it's enough for fibc
+  [--> (V store (appk env () (#%call-with-current-continuation) k))
+       ((cont k) store (appk env () (V) k))]
+
+  [--> (V_0 store (appk _ () (V ...) _))
+       ((#%values V_rest ...) store k)
+       (where ((cont k) V_rest ...) (reverse (V_0 V ...)))]
+
   [--> ((#%values V ...) store (cwvk V_consumer k))
        (V_lastval store (appk (env-empty) () (V ...) k))
        (where (V_lastval V ...) (reverse (V_consumer V ...)))]
@@ -885,6 +897,10 @@
                               (inc)
                               (inc))))
               3)
+
+  (test-equal (run-eval-e (call-with-current-continuation
+                           (lambda (k) (/ '0 (k '1)))))
+              1)
 
   (jam-test))
 
