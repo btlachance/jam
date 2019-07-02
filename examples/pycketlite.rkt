@@ -133,6 +133,17 @@
    (where env (env-extend env (x_toplevel ...) (loc ...)))])
 
 (define-metafunction pl
+  [(appk-header (appk _ () _ e_orig _)) e_orig]
+  [(appk-header (appk _ (name es _) _ _ _)) es]
+  [(appk-header _) ()])
+
+(define-metafunction pl
+  [(return-loop (e _ _ k)) (appk-header k)]
+  [(return-loop (V _ k)) (appk-header k)]
+  [(return-loop ((#%values V) _ k)) (appk-header k)]
+  [(return-loop _) ()])
+
+(define-metafunction pl
   [(toplevel-names ())
    ()]
 
@@ -519,9 +530,10 @@
 
   [--> (V_0 store (appk _ () (V ...) e_orig k))
        (e env_e store (begink* env_e (e_rest ...) k))
-       (where ({env_op (lambda (x ...) e e_rest ...)} V ...) (reverse (V_0 V ...)))
+       (where ({env_op (lambda (name xs _) e e_rest ...)} V ...) (reverse (V_0 V ...)))
+       (where (x ...) xs)
        (where (loc ...) (fresh-distinct-locations store (x ...)))
-       (where env_e (env-extend env_op (x ...) (loc ...)))
+       (where env_e (env-extend env_op xs (loc ...)))
        (where () (store-extend* store (loc ...) (V ...)))
        (where () (can-enter! e))]
 
@@ -1008,3 +1020,65 @@
       (system* racket (quote-source-file) "--racket" p))
 
     (check-equal? (get-output-string out) (get-expect p))))
+
+#|
+def get_printable_location(c, prev_c, ret):
+  if ret.is_none():
+    return c.to_toplevel_string()
+  else:
+    enter = "Enter " if ret.can_enter_return() else ""
+    return '%s (%s%s)' % (c.to_toplevel_string(), enter, ret.to_toplevel_string())
+eval_driver = jit.JitDriver(reds = (["t", "tmp"]), greens = (["c", "prev_c", "ret"]), get_printable_location = get_printable_location)
+def eval(t):
+  try:
+    t = eval_load(t)
+    tmp = core.make_none()
+    c = core.make_none()
+    prev_c = core.make_none()
+    ret = core.make_none()
+    t.mark_static()
+    while True:
+      eval_driver.jit_merge_point(c = c, prev_c = prev_c, ret = ret, t = t, tmp = tmp)
+      eval_unload(t)
+      t = step(t)
+      tmp = eval_control_string(t)
+      if tmp.static:
+        if not c.is_none():
+          prev_c = c
+        c = tmp
+      else:
+        c = core.make_none()
+
+      tmp = pl_metafun.return_loop(core.term_list([t]))
+      if tmp.static and not core.is_nil(tmp):
+        ret = tmp
+      else:
+        ret = core.make_none()
+
+      if c.can_enter():
+        if not ret.is_none():
+          ret._can_enter_return = True
+        eval_driver.can_enter_jit(c = c, prev_c = prev_c, ret = ret,
+                                  t = t, tmp = tmp)
+      elif ret.can_enter_return():
+        eval_driver.can_enter_jit(c = c, prev_c = prev_c, ret = ret,
+                                  t = t, tmp = tmp)
+  except core.JamDone as d:
+    return d.v
+  except core.JamError as e:
+    print("Jam Error: %s" % e.s)
+    if t:
+      print("Current term: %s" % t.to_toplevel_string())
+    else:
+      print("No current term")
+    return core.make_none()
+  except Exception as e:
+    print("Internal Error: %s" % e)
+    print("Current term:\n%s" % t.to_toplevel_string())
+    return core.make_none()
+  finally:
+    if core.stdout:
+      core.stdout.flush()
+    if core.stderr:
+      core.stderr.flush()
+|#
