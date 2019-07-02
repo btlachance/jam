@@ -266,7 +266,7 @@ class W_Integer(W_Term):
   def divmod_same(self, other):
     if other.n == 0:
       bail("divide: division by integer 0")
-    q, r = divmod(self.n, other.n)
+    q, r = self.n / other.n, self.n % other.n
     return W_Integer(q), W_Integer(r)
 
 class W_Real(W_Term):
@@ -322,7 +322,7 @@ class W_Real(W_Term):
   def divmod_same(self, other):
     if other.n == 0.0:
       bail("divmod: division by real 0")
-    q, r = divmod(self.n, other.n)
+    q, r = self.n / other.n, math.fmod(self.n, other.n)
     return W_Real(q), W_Real(r)
 
   def sin(self):
