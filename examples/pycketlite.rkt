@@ -134,7 +134,7 @@
 
 (define-metafunction pl
   [(appk-header (appk _ () _ e_orig _)) e_orig]
-  [(appk-header (appk _ (name es _) _ _ _)) es]
+  [(appk-header (appk _ (e _ ...) _ _ _)) e]
   [(appk-header _) ()])
 
 (define-metafunction pl
@@ -530,12 +530,13 @@
 
   [--> (V_0 store (appk _ () (V ...) e_orig k))
        (e env_e store (begink* env_e (e_rest ...) k))
-       (where ({env_op (lambda (name xs _) e e_rest ...)} V ...) (reverse (V_0 V ...)))
+       (where ({env_op (name callee _)} V ...) (reverse (V_0 V ...)))
+       (where (lambda (name xs _) e e_rest ...) callee)
        (where (x ...) xs)
        (where (loc ...) (fresh-distinct-locations store (x ...)))
        (where env_e (env-extend env_op xs (loc ...)))
        (where () (store-extend* store (loc ...) (V ...)))
-       (where () (can-enter! e))]
+       (where () (register-call e_orig callee (appk-header k)))]
 
   [--> (V_0 store (appk _ () (V ...) e_orig k))
        (e env_e store (begink* env_e (e_rest ...) k))
@@ -1037,6 +1038,7 @@ def eval(t):
     prev_c = core.make_none()
     ret = core.make_none()
     t.mark_static()
+    core.set_surrounding_lambda(t)
     while True:
       eval_driver.jit_merge_point(c = c, prev_c = prev_c, ret = ret, t = t, tmp = tmp)
       eval_unload(t)
@@ -1056,8 +1058,6 @@ def eval(t):
         ret = core.make_none()
 
       if c.can_enter():
-        if not ret.is_none():
-          ret._can_enter_return = True
         eval_driver.can_enter_jit(c = c, prev_c = prev_c, ret = ret,
                                   t = t, tmp = tmp)
       elif ret.can_enter_return():
@@ -1077,6 +1077,15 @@ def eval(t):
     print("Current term:\n%s" % t.to_toplevel_string())
     return core.make_none()
   finally:
+    import os
+    # For some reason os.getenv would complain about the number of
+    # arguments, so instead just access os.environ directly
+    dest = os.environ.get('JAM_CALLGRAPH_FILE')
+    if dest is not None:
+      if dest == '': # Just setting JAM_CALLGRAPH_FILE= means to use a default dest
+        dest = 'callgraph.dot'
+      with open(dest, 'w') as out:
+        core.call_graph.write_dot_file(out)
     if core.stdout:
       core.stdout.flush()
     if core.stderr:

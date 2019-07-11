@@ -5,3 +5,4 @@ Environment variables:
 - `JAM_SLOW_TEST`
 - `JAM_BINARY_NAME`
 - `JAM_QUIET_RPYTHON`
+- `JAM_CALLGRAPH_FILE`

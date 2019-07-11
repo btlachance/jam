@@ -1,4 +1,5 @@
 from rpython.rlib import jit, objectmodel
+from rpython.rlib.objectmodel import we_are_translated
 
 # TODO: Find heavily executed lambdas that do not participate in a loop in the
 # callgraph.
@@ -116,11 +117,23 @@ class CallGraph(object):
         return NOT_LOOP
 
     def write_dot_file(self, output): #pragma: no cover
+        def label(node):
+            if node.is_lambda():
+                contents = node.lambda_body0().to_toplevel_string()
+            else:
+                contents = node.to_toplevel_string()
+            if we_are_translated():
+                # This isn't quite right. This is wrapping the string
+                # in \\"...
+                from pypy.objspace.std.bytesobject import string_escape_encode
+                return string_escape_encode(contents, '\\"')
+            else:
+                return contents.replace('"', '\\"')
         counter = 0
         output.write("digraph callgraph {\n")
         names = Namer()
         for node in self.calls.iterkeys():
-            if node.body[0].should_enter:
+            if node.is_lambda() and node.lambda_body0().can_enter():
                 name = names.nameof(node)
                 output.write(name)
                 output.write(" [fillcolor=red,style=filled];\n")
@@ -130,6 +143,8 @@ class CallGraph(object):
                     name = names.nameof(node)
                     output.write(name)
                     output.write(" [fillcolor=green,style=filled];\n")
+            output.write(names.nameof(node))
+            output.write(' [label="%s"];\n' % label(node))
         for src, subdct in self.calls.iteritems():
             for dst in subdct:
                 srcname = names.nameof(src)
@@ -137,7 +152,7 @@ class CallGraph(object):
                 output.write(srcname)
                 output.write(" -> ")
                 output.write(dstname)
-                if dst.body[0].should_enter:
+                if dst.lambda_body0().can_enter():
                     output.write(" [color=blue]")
                 output.write(";\n")
         output.write("}\n")

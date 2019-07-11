@@ -509,6 +509,9 @@
    (metafunction
     'can-enter!
     (mf:data 'term_set_can_enter (pattern-of-ps (list '_))))
+   (metafunction
+    'register-call
+    (mf:data 'register_call (pattern-of-ps (list '_ '_ '_))))
    ))
 
 (define (nonterminal-metafunctions nt-names nts rep)

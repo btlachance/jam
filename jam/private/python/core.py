@@ -44,7 +44,8 @@ def subclass_responsibility2(self, v, w):
   bail("internal: Subclass responsibility")
 
 class W_Term(object):
-  _immutable_fields_ = ['static', '_can_enter', '_can_enter_return']
+  _immutable_fields_ = ['static', '_can_enter', '_can_enter_return',
+                        'surrounding_lambda']
 
   def is_nil(self):
     return False
@@ -128,6 +129,32 @@ class W_Term(object):
   def to_toplevel_string(self):
     return self.to_string()
 
+  def set_should_enter(self):
+    if not self._can_enter:
+      self._can_enter = True
+  def enable_jitting(self):
+    pass
+  def get_next_executed_ast(self):
+    pass
+  def is_lambda(self):
+    return False
+  def lambda_body0(self):
+    return make_none()
+  surrounding_lambda = None
+
+class W_ReturnLoopHeader(W_Term):
+  _immutable_fields_ = ['term']
+  def __init__(self, term):
+    W_Term.__init__(self)
+    self.term = term
+    self.surrounding_lambda = term.surrounding_lambda
+  def get_next_executed_ast(self):
+    return self
+  def set_should_enter(self):
+    t = self.term
+    if not t._can_enter_return:
+      t._can_enter_return = True
+
 def test_responsibility():
   with pytest.raises(JamError):
     W_Term().to_string()
@@ -188,6 +215,19 @@ class W_Pair(W_Term):
   def to_toplevel_string(self):
     subs = [t.to_toplevel_string() for t in W_TermList(self)]
     return "(%s)" % ' '.join(subs)
+
+  def is_lambda(self):
+    return self.head.atoms_equal(make_symbol("lambda"))
+  def lambda_body0(self):
+    after_ordinary_args = self.tail.tl()
+    if after_ordinary_args.hd().hd().atoms_equal(make_symbol("dot")):
+      return after_ordinary_args.tl().hd()
+    else:
+      return after_ordinary_args.hd()
+
+  def enable_jitting(self):
+    if self.is_lambda():
+      self.lambda_body0().set_should_enter()
 
 class W_Symbol(W_Term):
   _immutable_fields_ = ['s']
@@ -889,14 +929,6 @@ class W_MultipleEnvironment(W_Environment):
 
   @jit.unroll_safe
   def lookup(self, y):
-    # It's only safe to promote xs itself, and not something like a
-    # dictionary allocated during __init__ with name-index
-    # associations, because the environment might not escape, leading
-    # to us promoting a virtual. We technically should be checking
-    # that self.xs is static since there's nothing stopping a
-    # programmer from constructing new lists of variables and using
-    # that to make an environment, and we don't hash-cons arbitrary
-    # lists of variables
     xs = jit.promote(self.xs)
     index, at = -1, 0
 
@@ -920,23 +952,46 @@ class W_MultipleEnvironment(W_Environment):
         return True
     return self.env.is_bound(y)
 
-class W_CellEnvironment(W_MultipleEnvironment):
-  def lookup(self, y):
-    v = self.lookup_raw(y)
-    if v.is_cell():
-      return v.cell_value()
-    else:
-      return v
-
-  def lookup_raw(self, y):
-    return W_MultipleEnvironment.lookup(self, y)
-
 def test_env():
   empty = W_EmptyEnvironment()
   x, y = make_symbol('x'), make_symbol('y')
   xs0 = term_list([x, y])
   vs0 = term_list([make_integer(0), make_integer(1)])
   env0 = W_MultipleEnvironment(xs0, vs0, empty)
+
+  assert not empty.is_bound(x)
+  assert env0.is_bound(y)
+  assert not env0.is_bound(make_symbol('z'))
+  assert env0.lookup(x).int_value() == 0
+  assert env0.lookup(y).int_value() == 1
+
+class W_MultipleEnvironmentDynamic(W_Environment):
+  @jit.unroll_safe
+  def __init__(self, xs, vs, env):
+    W_Environment.__init__(self)
+    indices = {}
+    for x, i in izip2(W_TermList(xs), range(len(W_TermList(xs)))):
+      indices[x] = i
+    self.indices = indices
+    self.vs = [v for v in W_TermList(vs)]
+    self.env = env
+
+  def lookup(self, y):
+    i = self.indices.get(y, -1)
+    if i != -1:
+      return self.vs[i]
+    return self.env.lookup(y)
+
+  def is_bound(self, y):
+    return y in self.indices
+
+def test_envdynamic():
+  empty = W_EmptyEnvironment()
+
+  x, y = make_symbol('x'), make_symbol('y')
+  xs0 = term_list([x, y])
+  vs0 = term_list([make_integer(0), make_integer(1)])
+  env0 = W_MultipleEnvironmentDynamic(xs0, vs0, empty)
 
   assert not empty.is_bound(x)
   assert env0.is_bound(y)
@@ -963,6 +1018,17 @@ def test_envwrongnumber():
 
   with pytest.raises(JamError):
     environment_extend(term_list([empty, xs1, vs1]))
+
+class W_CellEnvironment(W_MultipleEnvironment):
+  def lookup(self, y):
+    v = self.lookup_raw(y)
+    if v.is_cell():
+      return v.cell_value()
+    else:
+      return v
+
+  def lookup_raw(self, y):
+    return W_MultipleEnvironment.lookup(self, y)
 
 def test_envcells():
   empty = W_EmptyEnvironment()
@@ -1000,7 +1066,11 @@ def environment_extend(t):
   [env, xs, vs] = [x for x in W_TermList(t)]
   if not len(W_TermList(xs)) == len(W_TermList(vs)):
     bail("can't extend environment with two lists of unequal length")
-  return W_MultipleEnvironment(xs, vs, env)
+
+  if xs.static:
+    return W_MultipleEnvironment(xs, vs, env)
+  else:
+    return W_MultipleEnvironmentDynamic(xs, vs, env)
 
 @jit.unroll_safe
 def environment_empty(t):
@@ -1290,8 +1360,33 @@ def store_dereference(t):
   return s.deref(l)
 def term_set_can_enter(t):
   [term] = [x for x in W_TermList(t)]
-  term._can_enter = True
+  term.set_should_enter()
   return make_nil()
+
+
+from pycket.callgraph import CallGraph
+call_graph = CallGraph()
+
+@jit.unroll_safe
+def register_call(t):
+  [callsite, callee, return_loop_header] = [x for x in W_TermList(t)]
+  return_loop_header = W_ReturnLoopHeader(return_loop_header)
+  call_graph.register_call(callee, callsite, return_loop_header, None)
+  return make_nil()
+
+def set_surrounding_lambda(t, current_lam=None):
+  t.surrounding_lambda = current_lam
+
+  if t.is_pair():
+    head = t.hd()
+    tail = t.tl()
+    if t.is_lambda():
+      current_lam = t
+
+    # Sloppy since this sets surrounding_lambda to every subterm,
+    # e.g. the arg list, to the current lambda. But it should be fine.
+    set_surrounding_lambda(head, current_lam)
+    set_surrounding_lambda(tail, current_lam)
 
 if __name__ == "__test__":
   pytest.main([__file__, "-q"])
