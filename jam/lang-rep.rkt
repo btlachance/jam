@@ -425,6 +425,12 @@
    (metafunction
     'reverse
     (mf:data 'list_reverse (repeat-pattern '_)))
+   (metafunction
+    'append
+    (mf:data 'list_append (pattern-of-ps (list (repeat-pattern '_) (repeat-pattern '_)))))
+   (metafunction
+    'same-length?
+    (mf:data 'lists_have_same_length (pattern-of-ps (list (repeat-pattern '_) (repeat-pattern '_)))))
 
    (metafunction
     'integer-add
@@ -598,8 +604,13 @@
            (mf-name 'fresh-location)
            (mf:data 'store_fresh_location (pattern-of-ps (list nt))))
           (metafunction
+           (mf-name 'fresh-distinct-locations)
+           (mf:data 'store_fresh_distinct_locations (pattern-of-ps (list nt (repeat-pattern '_)))))
+          (metafunction
            (mf-name 'extend)
-           (mf:data 'store_extend (pattern-of-ps (list nt domain range))))
+           (mf:data 'store_extend (pattern-of-ps (list nt
+                                                       (repeat-pattern domain)
+                                                       (repeat-pattern range)))))
           (metafunction
            (mf-name 'update-location)
            (mf:data 'store_update_location (pattern-of-ps (list nt domain range))))

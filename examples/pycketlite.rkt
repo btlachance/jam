@@ -69,14 +69,15 @@
              ;; env               environment for remaining RHS
              ;; (x ...)           variables the current RHS results will be bound to
              ;; ([(x ...) e] ...) remaining variables to bind/RHS to evaluate
-             ;; ((x V) ...)       variables/values for evaluated RHS so far
+             ;; (x ...)           variables and
+             ;; (V ...)           values for evaluated RHS so far
              ;; (e e ...)         body expressions
              ;;
              ;; (We could keep the list of variables/values as two
              ;; lists instead of one zipped one if we had an explicit
              ;; way to check that #values returned to the continuation
              ;; matched #variables for the current RHS)
-             (letk env (x ...) ([(x ...) e] ...) ((x V) ...) (e e ...) _)
+             (letk env (x ...) ([(x ...) e] ...) (x ...) (V ...) (e e ...) _)
 
              ;; Like letk but RHS and the body are evaluated in the
              ;; same environment, and values are set in that
@@ -126,10 +127,10 @@
                 #%current-inexact-milliseconds
                 #%call-with-current-continuation)))
    (where store (store-empty))
-   (where (loc ...) (fresh-distinct-locations store (x ...)))
+   (where (loc ...) (store-fresh-distinct-locations store (x ...)))
    (where env (env-extend (env-empty) (x ...) (loc ...)))
-   (where () (store-extend* store (loc ...) (V ...)))
-   (where (loc ...) (fresh-distinct-locations store (x_toplevel ...)))
+   (where () (store-extend store (loc ...) (V ...)))
+   (where (loc ...) (store-fresh-distinct-locations store (x_toplevel ...)))
    (where env (env-extend env (x_toplevel ...) (loc ...)))])
 
 (define-metafunction pl
@@ -156,19 +157,11 @@
 (define-metafunction pl
   [(flatten-vars ())
    ()]
-  [(flatten-vars (() (x ...) ...))
-   (flatten-vars ((x ...) ...))]
-  [(flatten-vars ((x_0 x_rest ...) (x ...) ...))
-   (x_0 x_flattened ...)
-   (where (x_flattened ...) (flatten-vars ((x_rest ...) (x ...) ...)))])
-
-(define-metafunction pl
-  [(append () ((name any _) ...))
-   (any ...)]
-  [(append ((name any_first _) (name any_rest _) ...)
-           ((name any _) ...))
-   (any_first appended ...)
-   (where ((name appended _) ...) (append (any_rest ...) (any ...)))])
+  [(flatten-vars (cons* () (name rest ((x ...) ...))))
+   (flatten-vars rest)]
+  [(flatten-vars (cons* (cons* x_0 (name xs (x_rest ...))) (name rest ((x ...) ...))))
+   (cons* x_0 flat)
+   (where (name flat (x_flattened ...)) (flatten-vars (cons* xs rest)))])
 
 (define-metafunction pl
   [(load-pl string_path)
@@ -439,38 +432,90 @@
    (integer->real (clock-milliseconds))])
 
 (define-metafunction pl
-  [(prefix-and-rest () (V_rest ...))
-   (() (apply-op #%list (V_rest ...)))]
-  [(prefix-and-rest (x y ...) (V_0 V ...))
-   ((V_0 V_prefix ...) V_rest)
-   (where ((V_prefix ...) V_rest) (prefix-and-rest (y ...) (V ...)))])
+  [(prefix-and-rest () (name rest (V_rest ...)))
+   (() (apply-op #%list rest))]
+  [(prefix-and-rest (cons* x (name ys (y ...))) (cons* V_0 (name vs (V ...))))
+   ((cons* V_0 prefix) V_rest)
+   (where ((name prefix (V_prefix ...)) V_rest) (prefix-and-rest ys vs))])
 
 (define-metafunction pl
   [(begink* env () k) k]
-  [(begink* env (e e_rest ...) k) (begink env (e e_rest ...) k)])
+  [(begink* env (name es (e e_rest ...)) k) (begink env es k)])
 
 (define-metafunction pl
-  [(fresh-distinct-locations store ()) ()]
-  [(fresh-distinct-locations store ((name _1 _) (name _2 _) ...))
-   ((store-fresh-location store) loc ...)
-   (where (loc ...) (fresh-distinct-locations store (_2 ...)))])
+  [(reverse-args-onto (cons* #%null (name vs (V ...))))
+   vs]
+  [(reverse-args-onto (cons* (#%cons V_1 V_2) (name vs (V ...))))
+   (reverse-args-onto (cons* V_2 (cons* V_1 vs)))])
 
 (define-metafunction pl
-  [(store-extend* store () ()) ()]
-  [(store-extend* store (loc loc_rest ...) (V V_rest ...))
-   (store-extend* store (loc_rest ...) (V_rest ...))
-   (where () (store-extend store loc V))])
+  [(apply-proc {env_op (name callee _)} (name vs (V ...)) e_orig store k)
+   (e env_e store (begink* env_e es k))
+   (where (cons* lambda (cons* (name xs _) (cons* e (name es (e_rest ...))))) callee)
+   (where (x ...) xs)
+   (where (name locs (loc ...)) (store-fresh-distinct-locations store xs))
+   (where env_e (env-extend env_op xs locs))
+   (where () (store-extend store locs vs))
+   (where () (register-call e_orig callee (appk-header k)))]
+
+  [(apply-proc {env_op (cons* lambda (cons* x (cons* e (name es (e_rest ...)))))} (name vs (V ...)) e_orig store k)
+   (e env_e store (begink* env_e es k))
+   (where (loc) (store-fresh-distinct-locations store (x)))
+   (where env_e (env-extend env_op (x) (loc)))
+   (where () (store-extend store (loc) ((apply-op #%list vs))))
+   (where () (can-enter! e))]
+
+  [(apply-proc {env_op l} (name vs (V ...)) e_orig store k)
+   (e env_e store (begink* env_e es k))
+   (where (cons* lambda (cons* (name xs (x ...)) (cons* (dot y) (cons* e (name es (e_rest ...)))))) l)
+   (where ((name prefix (V_prefix ...)) V_rest) (prefix-and-rest xs vs))
+   (where (name args (x_args ...)) (append xs (y)))
+   (where (name locs (loc ...)) (store-fresh-distinct-locations store args))
+   (where env_e (env-extend env_op
+                            args
+                            locs))
+   (where () (store-extend store locs (append prefix (V_rest))))
+   (where () (can-enter! e))]
+
+  [(apply-proc #%apply (cons* V_fun (name args (V_args ...))) e_orig store k)
+   (apply-proc V_fun (reverse (reverse-args-onto args)) e_orig store k)
+   (where (name args (V ...)) (reverse args))]
+
+  [(apply-proc #%values (name vals (V_vals ...)) e_orig store k)
+   ((cons* #%values vals) store k)]
+
+  [(apply-proc #%call-with-values (V_producer V_consumer) e_orig store k)
+   (e env store (begink* env es (cwvk V_consumer k)))
+   ;; XXX This isn't exactly what Racket does; if the producer has a
+   ;; 0-arg body then the 0-arg body is used. Otherwise an error is
+   ;; raised. What I currently have rules out things like (lambda x e
+   ;; e_rest ...)
+   (where {env (cons* lambda (cons* () (cons* e (name es (e_rest ...)))))} V_producer)
+   (where () (can-enter! e))]
+
+  ;; XXX this isn't quite right in terms of top-level begin
+  ;; expressions but it's enough for fibc
+  [(apply-proc #%call-with-current-continuation (V) e_orig store k)
+   ((cont k) store (appk env () (V) e_orig k))]
+
+  [(apply-proc (cont k) (name rest (V_rest ...)) e_orig store _)
+   ((cons* #%values rest) store k)]
+
+  [(apply-proc V_op (name vs (V ...)) e_orig store k)
+   (V_result store k)
+   (where V_result (apply-op V_op vs))])
 
 (define-transition pl
   step
-  [--> (topk env store (t t_rest ...))
-       (t (topk env store (t_rest ...)))]
+
+  [--> (topk env store (cons* t (name rest (t_rest ...))))
+       (t (topk env store rest))]
 
   [--> (e (topk env store P))
        (e env store (topk env store P))]
 
-  [--> ((define-values (x ...) e) (topk env store P))
-       (e env store (defk (x ...) env P))]
+  [--> ((define-values (name vars (x ...)) e) (topk env store P))
+       (e env store (defk vars env P))]
 
   [--> (x env store k)
        (V store k)
@@ -483,31 +528,34 @@
        (c store k)]
 
   [--> ((name orig e) env store k)
-       (e env store (appk env (e_args ...) () orig k))
-       (where (e e_args ...) orig)]
+       (e env store (appk env args () orig k))
+       (where (cons* e (name args (e_args ...))) orig)]
 
   [--> ((if e_test e_then e_else) env store k)
        (e_test env store (ifk env e_then e_else k))]
 
-  [--> ((let-values () e e_rest ...) env store k)
-       (e env store (begink* env (e_rest ...) k))]
+  [--> ((cons* let-values (cons* () (cons* e (name rest (e_rest ...))))) env store k)
+       (e env store (begink* env rest k))]
 
-  [--> ((let-values ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) e_body ...) env store k)
-       (e_first env store (letk env (x_first ...) ([(x_rest ...) e_rest] ...)
-                                () (e_body ...) k))]
+  [--> ((cons* let-values (cons* (cons* [(name first (x_first ...)) e_first]
+                                        (name rest ([(x_rest ...) e_rest] ...)))
+                                 (name body (e_body ...)))) env store k)
+       (e_first env store (letk env first rest
+                                () () body k))]
 
-  [--> ((letrec-values () e e_rest ...) env store k)
-       (e env store (begink* env (e_rest ...) k))]
+  [--> ((cons* letrec-values (cons* () (cons* e (name rest (e_rest ...))))) env store k)
+       (e env store (begink* env rest k))]
 
-  [--> ((letrec-values ([(x ...) e] ...) e_body ...) env store k)
-       (e_first env_rec store (letreck env_rec (x_first ...) ([(x_rest ...) e_rest] ...) (e_body ...) k))
-       (where ([(x_first ...) e_first] [(x_rest ...) e_rest] ...) ([(x ...) e] ...))
-       (where (x_vars ...) (flatten-vars ((x ...) ...)))
-       (where (loc ...) (fresh-distinct-locations store (x_vars ...)))
-       (where env_rec (env-extend env (x_vars ...) (loc ...)))]
+  [--> ((cons* letrec-values (cons* (name bps _) (name body (e_body ...)))) env store k)
+       (e_first env_rec store (letreck env_rec first rest body k))
+       (where ([(x ...) e] ...) bps)
+       (where (cons* [(name first (x_first ...)) e_first] (name rest ([(x_rest ...) e_rest] ...))) bps)
+       (where (name xs (x_vars ...)) (flatten-vars ((x ...) ...)))
+       (where (name locs (loc ...)) (store-fresh-distinct-locations store xs))
+       (where env_rec (env-extend env xs locs))]
 
-  [--> ((begin e e_rest ...) env store k)
-       (e env store (begink* env (e_rest ...) k))]
+  [--> ((cons* begin (cons* e (name rest (e_rest ...)))) env store k)
+       (e env store (begink* env rest k))]
 
   [--> ((set! x e) env store k)
        (e env store (setk x env k))]
@@ -520,125 +568,72 @@
   [--> ((#%values V ...) store (topk env_top _ P))
        (topk env_top store P)]
 
-  [--> ((#%values V ...) store (defk (x ...) env_top P))
+  [--> ((cons* #%values (name vs (V ...))) store (defk (x ...) env_top P))
        (topk env_top store P)
-       (where (loc ...) ((env-lookup env_top x) ...))
-       (where () (store-extend* store (loc ...) (V ...)))]
+       (where (name locs (loc ...)) ((env-lookup env_top x) ...))
+       (where () (store-extend store locs vs))]
 
-  [--> (V_0 store (appk env (e_arg e_args ...) (V ...) e_orig k))
-       (e_arg env store (appk env (e_args ...) (V_0 V ...) e_orig k))]
-
-  [--> (V_0 store (appk _ () (V ...) e_orig k))
-       (e env_e store (begink* env_e (e_rest ...) k))
-       (where ({env_op (name callee _)} V ...) (reverse (V_0 V ...)))
-       (where (lambda (name xs _) e e_rest ...) callee)
-       (where (x ...) xs)
-       (where (loc ...) (fresh-distinct-locations store (x ...)))
-       (where env_e (env-extend env_op xs (loc ...)))
-       (where () (store-extend* store (loc ...) (V ...)))
-       (where () (register-call e_orig callee (appk-header k)))]
-
-  [--> (V_0 store (appk _ () (V ...) e_orig k))
-       (e env_e store (begink* env_e (e_rest ...) k))
-       (where ({env_op (lambda x e e_rest ...)} V ...) (reverse (V_0 V ...)))
-       (where (loc) (fresh-distinct-locations store (x)))
-       (where env_e (env-extend env_op (x) (loc)))
-       (where () (store-extend store loc (apply-op #%list (V ...))))
-       (where () (can-enter! e))]
-
-  [--> (V_0 store (appk _ () (V ...) e_orig k))
-       (e env_e store (begink* env_e (e_rest ...) k))
-       (where ({env_op l} V ...) (reverse (V_0 V ...)))
-       (where (lambda (x ...) (dot y) e e_rest ...) l)
-       (where ((V_prefix ...) V_rest) (prefix-and-rest (x ...) (V ...)))
-       (where (x_args ...) (append (x ...) (y)))
-       (where (loc ...) (fresh-distinct-locations store (x_args ...)))
-       (where env_e (env-extend env_op
-                                (x_args ...)
-                                (loc ...)))
-       (where () (store-extend* store (loc ...) (append (V_prefix ...) (V_rest))))
-       (where () (can-enter! e))]
-
-  [--> (V_0 store (appk env () (V ...) e_orig k))
-       (V_arglast store (appk env () (V_argother ...) e_orig k))
-       (where (#%apply V_fun V_args ...) (reverse (V ...)))
-       (where #%null V_0)
-       (where (V_arglast V_argother ...) (reverse (V_fun V_args ...)))]
-
-  [--> (V_0 store (appk env () (V ...) e_orig k))
-       (V_cdr store (appk env () (V_car V ...) e_orig k))
-       (where (#%apply V_fun V_args ...) (reverse (V ...)))
-       (where (#%cons V_car V_cdr) V_0)]
-
-  [--> (V_0 store (appk _ () (V ...) e_orig k))
-       ((#%values V_vals ...) store k)
-       (where (#%values V_vals ...) (reverse (V_0 V ...)))]
-
-  [--> (V_0 store (appk _ () (V ...) e_orig k))
-       (e env store (begink* env (e_rest ...) (cwvk V_consumer k)))
-       (where (#%call-with-values V_producer V_consumer) (reverse (V_0 V ...)))
-       ;; XXX This isn't exactly what Racket does; if the producer has
-       ;; a 0-arg body then the 0-arg body is used. Otherwise an error
-       ;; is raised. What I currently have rules out things like
-       ;; (lambda x e e_rest ...)
-       (where {env (lambda () e e_rest ...)} V_producer)
-       (where () (can-enter! e))]
-
-  ;; XXX this isn't quite right in terms of top-level begin
-  ;; expressions but it's enough for fibc
-  [--> (V store (appk env () (#%call-with-current-continuation) e_orig k))
-       ((cont k) store (appk env () (V) e_orig k))]
-
-  [--> (V_0 store (appk _ () (V ...) e_orig _))
-       ((#%values V_rest ...) store k)
-       (where ((cont k) V_rest ...) (reverse (V_0 V ...)))]
-
-  [--> ((#%values V ...) store (cwvk V_consumer k))
-       (V_lastval store (appk (env-empty) () (V ...) (quote #f) k))
-       (where (V_lastval V ...) (reverse (V_consumer V ...)))]
+  [--> (V_0 store (appk env (cons* e_arg (name es (e_args ...))) (name vs (V ...)) e_orig k))
+       (e_arg env store (appk env es (cons* V_0 vs) e_orig k))]
 
   [--> (V store (appk _ () (#%raise) e_orig k))
        (topk (env-empty) store ())]
 
-  [--> (V_0 store (appk _ () (V ...) e_orig k))
-       (V_result store k)
-       (where (V_op V ...) (reverse (V_0 V ...)))
-       (where V_result (apply-op V_op (V ...)))]
+  [--> (V_0 store (appk _ () (name vs (V ...)) e k))
+       (apply-proc V_proc args e store k)
+       (where (cons* V_proc (name args (V_args ...))) (reverse (cons* V_0 vs)))]
 
-  [--> ((#%values V_new ...) store (letk env_e (x_new ...) (name remaining _)
-                                         (name sofar _) (e_body ...) k))
-       (e env_e store (letk env_e (x ...) ([(x_rest ...) e_rest] ...)
-                            (append ((x_new V_new) ...) ((x_sofar V_sofar) ...))
-                            (e_body ...) k))
-       (where ([(x ...) e] [(x_rest ...) e_rest] ...) remaining)
-       (where ((x_sofar V_sofar) ...) sofar)]
+  [--> ((cons* #%values (name vs (V ...))) store (cwvk V_consumer k))
+       (V_lastval store (appk (env-empty) () vs (quote #f) k))
+       (where (cons* V_lastval (name vs (V ...))) (reverse (cons* V_consumer vs)))]
 
-  [--> ((#%values V_new ...) store (letk env (x_new ...) ()
-                                         ((x_sofar V_sofar) ...) (e e_rest ...) k))
-       (e env_body store (begink* env_body (e_rest ...) k))
-       (where (loc ...) (fresh-distinct-locations store (append (x_new ...) (x_sofar ...))))
+  [--> ((cons* #%values (name Vnew _))
+        store
+        (letk env_e (name xnew _) (name remaining _)
+              (name xsofar _) (name Vsofar _)
+              (name body _) k))
+       (e env_e store (letk env_e xs rest
+                            (append xnew xsofar)
+                            (append Vnew Vsofar)
+                            body k))
+       (where #t (same-length? xnew Vnew))
+       (where (cons* [(name xs (x ...)) e] (name rest ([(x_rest ...) e_rest] ...))) remaining)]
+
+  [--> ((cons* #%values (name new (V_new ...)))
+        store
+        (letk env (name xs _) ()
+              (name xsofar _) (name Vsofar _)
+              (cons* e (name rest _)) k))
+       (e env_body store (begink* env_body rest k))
+       (where #t (same-length? xs new))
+       (where (name all _) (append xs xsofar))
+       (where (name locs _) (store-fresh-distinct-locations store all))
        (where env_body (env-extend env
-                                   (append (x_new ...) (x_sofar ...))
-                                   (loc ...)))
-       (where () (store-extend* store (loc ...) (append (V_new ...) (V_sofar ...))))]
+                                   all
+                                   locs))
+       (where () (store-extend store locs (append new Vsofar)))]
 
-  [--> ((#%values V_new ...) store (letreck env_rec (x_new ...)
-                                            (name remaining _)
-                                            (e_body ...) k))
-       (e env_rec store (letreck env_rec (x ...)
-                                 ([(x_rest ...) e_rest] ...)
-                                 (e_body ...) k))
-       (where ([(x ...) e] [(x_rest ...) e_rest] ...) remaining)
-       (where (loc ...) ((env-lookup env_rec x_new) ...))
-       (where () (store-extend* store (loc ...) (V_new ...)))]
+  [--> ((cons* #%values (name new (V_new ...)))
+        store
+        (letreck env_rec (x_new ...)
+                 (name remaining _)
+                 (name body (e_body ...)) k))
+       (e env_rec store (letreck env_rec xs
+                                 rest
+                                 body k))
+       (where (cons* [(name xs (x ...)) e] (name rest ([(x_rest ...) e_rest] ...))) remaining)
+       (where (name locs (loc ...)) ((env-lookup env_rec x_new) ...))
+       (where () (store-extend store locs new))]
 
-  [--> ((#%values V_new ...) store (letreck env_rec (x_new ...) () (e e_rest ...) k))
-       (e env_rec store (begink* env_rec (e_rest ...) k))
-       (where (loc ...) ((env-lookup env_rec x_new) ...))
-       (where () (store-extend* store (loc ...) (V_new ...)))]
+  [--> ((cons* #%values (name new (V_new ...)))
+        store
+        (letreck env_rec (x_new ...) () (cons* e (name rest (e_rest ...))) k))
+       (e env_rec store (begink* env_rec rest k))
+       (where (name locs (loc ...)) ((env-lookup env_rec x_new) ...))
+       (where () (store-extend store locs new))]
 
-  [--> ((#%values V ...) store (begink env (e e_rest ...) k))
-       (e env store (begink* env (e_rest ...) k))]
+  [--> ((#%values V ...) store (begink env (cons* e (name rest (e_rest ...))) k))
+       (e env store (begink* env rest k))]
 
   [--> (#f store (ifk env _ e_else k))
        (e_else env store k)]
@@ -795,6 +790,8 @@
                            '5 '6 '7 '8 '9))
               (#%cons 6 (#%cons 5 (#%cons 7 (#%cons 8 (#%cons 9 #%null))))))
 
+  (test-equal (run-eval-e (apply (lambda x x) '1 (list '2 '3)))
+              (#%cons 1 (#%cons 2 (#%cons 3 #%null))))
   (test-equal (run-eval-e (apply (lambda (x y) (+ x y)) '1 (list '2)))
               3)
   (test-equal (run-eval-e (apply (lambda (x y) (+ x y)) (list '3 '4)))
@@ -987,7 +984,7 @@
          #:prompt? #f))]
     [#f (void)]))
 
-(module+ test
+#;(module+ test
   (require syntax/location rackunit)
   (define racket (find-executable-path "racket"))
 
@@ -1020,7 +1017,9 @@
                    [current-error-port out])
       (system* racket (quote-source-file) "--racket" p))
 
-    (check-equal? (get-output-string out) (get-expect p))))
+    (with-check-info
+      (['source p])
+      (check-equal? (get-output-string out) (get-expect p)))))
 
 #|
 def get_printable_location(c, prev_c, ret):

@@ -370,7 +370,7 @@ class W_Real(W_Term):
   def divmod_same(self, other):
     if other.n == 0.0:
       bail("divmod: division by real 0")
-    q, r = self.n / other.n, math.fmod(self.n, other.n)
+    q, r = math.floor(self.n / other.n), math.fmod(self.n, other.n)
     return W_Real(q), W_Real(r)
 
   def sin(self):
@@ -581,10 +581,14 @@ class W_TermList(W_Term):
 
   @jit.unroll_safe
   def __iter__(self):
-    self = self.t
-    while not self.is_nil():
-      yield self.hd()
-      self = self.tl()
+    return W_TermList(self.t)
+
+  def next(self):
+    if self.t.is_nil():
+      raise StopIteration()
+    hd = self.t.hd()
+    self.t = self.t.tl()
+    return hd
 
   @jit.unroll_safe
   def __len__(self):
@@ -709,11 +713,16 @@ def map_terms(f, terms):
     mapped.append(f(term))
   return term_list(mapped)
 
-# XXX RPython balks when I specialize at 0,1 but since the args end up being
-# the same type for both of my calls to this then it's apparently sufficinet
-# to specialize on the type of xs
-@specialize.argtype(0)
+# I can't specialize against the second argument; RPython seems to
+# think the next() method of the iterator's I pass to this (W_TermList
+# iterators) have as many arguments as izip2. Or something like
+# that. When I specialize against argtype 1 (or argtype 0,1) there's a
+# list index out of range error in function specialize_argtype in
+# rpython.annotator.specialize; it tries to get args_s[1] for the next
+# method, which is bogus. I only have a few callsites to izip2, so
+# specializing the function to each one should be fine...
 @jit.unroll_safe
+@specialize.call_location() 
 def izip2(xs, ys):
   ixs, iys = iter(xs), iter(ys)
   while True:
@@ -1125,6 +1134,19 @@ def list_reverse(t):
   args.reverse()
   return term_list(args)
 
+@jit.unroll_safe
+def list_append(t):
+  [xs, ys] = [x for x in W_TermList(t)]
+
+  if xs.is_nil():
+    return ys
+
+  xs = [x for x in W_TermList(xs)]
+  xs.reverse()
+  for x in xs:
+    ys = make_pair(x, ys)
+  return ys
+
 def clock_milliseconds(t):
   [] = [x for x in W_TermList(t)]
   return make_integer(int(time.clock() * 1000))
@@ -1345,9 +1367,16 @@ def store_fresh_location(t):
   [s] = [t for t in W_TermList(t)]
   return s.fresh_location()
 @jit.unroll_safe
+def store_fresh_distinct_locations(t):
+  [s, ts] = [t for t in W_TermList(t)]
+  return term_list([s.fresh_location() for t in W_TermList(ts)])
+@jit.unroll_safe
 def store_extend(t):
-  [s, l, v] = [t for t in W_TermList(t)]
-  s.extend(l, v)
+  [s, ls, vs] = [t for t in W_TermList(t)]
+  ls = [l for l in W_TermList(ls)]
+  vs = [v for v in W_TermList(vs)]
+  for l, v in izip2(ls, vs):
+    s.extend(l, v)
   return make_nil()
 @jit.unroll_safe
 def store_update_location(t):
@@ -1358,11 +1387,17 @@ def store_update_location(t):
 def store_dereference(t):
   [s, l] = [t for t in W_TermList(t)]
   return s.deref(l)
+@jit.unroll_safe
 def term_set_can_enter(t):
   [term] = [x for x in W_TermList(t)]
   term.set_should_enter()
   return make_nil()
-
+@jit.unroll_safe
+def lists_have_same_length(t):
+  [xs, ys] = [t for t in W_TermList(t)]
+  while not xs.is_nil() and not ys.is_nil():
+    xs, ys = xs.tl(), ys.tl()
+  return make_boolean(xs.is_nil() and ys.is_nil())
 
 from pycket.callgraph import CallGraph
 call_graph = CallGraph()

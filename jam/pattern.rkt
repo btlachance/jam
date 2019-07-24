@@ -35,10 +35,12 @@
 ;; - (nonterminal symbol)
 ;; - (name symbol pattern)
 ;; - (literal datum)
+;; - (cons* pattern pattern)
 ;; - list-pattern
 (struct nonterminal (nt) #:transparent)
 (struct name (name pattern) #:transparent)
 (struct literal (v) #:transparent)
+(struct cons* (car cdr) #:transparent)
 
 ;; a list-pattern is one of
 ;; - '()
@@ -66,6 +68,8 @@
     [(nonterminal _) z]
     [(name _ p) (fold-pattern-literals f z p)]
     [(literal _) (f p z)]
+    [(cons* p1 p2)
+     (fold-pattern-literals f (fold-pattern-literals f z p2) p1)]
     ['() z]
     [(repeat p) (fold-pattern-literals f z p)]
     [(pair p lp)
@@ -97,6 +101,7 @@
     ['_ '()]
     [(name var p) (list var)]
     [(literal _) '()]
+    [(cons* p1 p2) (append (name-ocurrences-in p1) (name-ocurrences-in p2))]
     ['() '()]
     [(repeat p) (name-ocurrences-in p)]
     [(pair p p*)
@@ -170,6 +175,11 @@
     [(literal (? boolean? b))
      `(= (boolean ,b) ,source)]
 
+    [(cons* p1 p2)
+     `(and (pair? ,source)
+           ,(compile p1 `(hd ,source))
+           ,(compile p2 `(tl ,source)))]
+
     ['()
      `(nil? ,source)]
 
@@ -218,6 +228,10 @@
          [(list n selector)
           (values name (list (add1 n) `(map ,(proc* '(t) selector) ,source)))]))]
 
+    [(cons* p1 p2)
+     (hash-union (compile/deconstruct p1 `(hd ,source))
+                 (compile/deconstruct p2 `(tl ,source)))]
+
     [(pair p lp)
      (hash-union (compile/deconstruct p `(hd ,source))
                  (compile/deconstruct lp `(tl ,source)))]))
@@ -230,6 +244,7 @@
      (set x)]
     [(name x _) (set x)]
     [(repeat p) (free-vars p)]
+    [(cons* p1 p2) (set-union (free-vars p1) (free-vars p2))]
     [(pair p lp) (set-union (free-vars p) (free-vars lp))]
     [(mf-apply _ _ t) (free-vars t)]))
 
@@ -330,6 +345,9 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
      `(map ,(proc* '(t) (compile/transcribe p decomp-env))
            (decompose-values (list ,@(map boxed-level frees))
                              (list ,@(map selector-of frees))))]
+
+    [(cons* p1 p2) `(pair ,(compile/t p1) ,(compile/t p2))]
+
     [(pair p lp)
      `(pair ,(compile/t p)
             ,(compile/t lp))]))
@@ -390,7 +408,7 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
   (define (parse-pattern stx #:recur [recur #f])
     (define recur* (or recur parse-pattern))
     (syntax-parse stx
-      #:datum-literals (name)
+      #:datum-literals (name cons*)
       [x:jam-id
        #:when (pattern-keyword? #'x)
        (if (underscore? #'x)
@@ -419,6 +437,8 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
       [(name x:jam-id p)
        (name (syntax-e #'x) (recur* #'p))]
 
+      [(cons* p-car p-cdr)
+       (cons* (recur* #'p-car) (recur* #'p-cdr))]
 
       [(_ ...)
        (parse-list-pattern this-syntax recur*)]))

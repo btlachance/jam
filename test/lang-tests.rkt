@@ -286,21 +286,21 @@
   (current-test-language under))
 
 (define-metafunction under
-  [(append () ((name ys _) ...))
+  [(append-u () ((name ys _) ...))
    (ys ...)]
-  [(append ((name x _) (name xs _) ...) ((name ys _) ...))
+  [(append-u ((name x _) (name xs _) ...) ((name ys _) ...))
    (x zs ...)
-   (where ((name zs _) ...) (append (xs ...) (ys ...)))])
+   (where ((name zs _) ...) (append-u (xs ...) (ys ...)))])
 
 (module+ test
-  (test-equal (append () ()) ())
-  (test-equal (append (1 #t 3) (4 #f 6)) (1 #t 3 4 #f 6)))
+  (test-equal (append-u () ()) ())
+  (test-equal (append-u (1 #t 3) (4 #f 6)) (1 #t 3 4 #f 6)))
 
 (define-metafunction under
   [(vars-of x) (x)]
   [(vars-of (lambda (x) e)) (vars-of e)]
   [(vars-of (e_1 e_2))
-   (append (x_1 ...) (x_2 ...))
+   (append-u (x_1 ...) (x_2 ...))
    (where (x_1 ...) (vars-of e_1))
    (where (x_2 ...) (vars-of e_2))])
 
@@ -372,10 +372,36 @@
    ()
    (where l_1 (store-fresh-location store))
    (where l_2 (store-fresh-location store))
-   (where () (store-extend store l_1 l_2))
+   (where (_ _) (store-fresh-distinct-locations store (l_1 l_2)))
+   (where () (store-extend store (l_1) (l_2)))
    (where l (store-dereference store l_1))
    (where () (store-update-location store l_1 l_1))])
 (module+ test
   (current-test-language store)
   (test-equal (store-test (store-empty)) ())
+  (jam-test))
+
+(define-language lists)
+(module+ test
+  (current-test-language lists)
+  (test-equal (append () (a)) (a))
+  (test-equal (append (1 2 3) (a b c)) (1 2 3 a b c))
+  (test-equal (same-length? () ()) #t)
+  (test-equal (same-length? (a) (1)) #t)
+  (test-equal (same-length? (a) ()) #f)
+  (test-equal (same-length? () (0)) #f)
+  (jam-test))
+
+(define-language cons*)
+(define-metafunction cons*
+  [(test)
+   ()
+   (where (cons* 1 (2)) (1 2))
+   (where (cons* (name a _) (name b _)) (1 2))
+   (where 1 a)
+   (where (2) b)])
+
+(module+ test
+  (current-test-language cons*)
+  (test-equal (test) ())
   (jam-test))

@@ -236,6 +236,8 @@
         'ExnTestSuccess 'ExnTestSuccess
         'ExnTestFailure 'ExnTestFailure
         'list_reverse 'list_reverse
+        'list_append 'list_append
+        'lists_have_same_length 'lists_have_same_length
         'integer_add0 'integer_add0
         'integer_subtract0 'integer_subtract0
         'integer_multiply0 'integer_multiply0
@@ -279,6 +281,7 @@
         'is_store 'is_store
         'store_empty 'store_empty
         'store_fresh_location 'store_fresh_location
+        'store_fresh_distinct_locations 'store_fresh_distinct_locations
         'store_extend 'store_extend
         'store_update_location 'store_update_location
         'store_dereference 'store_dereference
