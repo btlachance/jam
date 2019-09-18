@@ -788,6 +788,11 @@ def test_decompose_values():
             or x.tl().hd().int_value() == 4)
     assert x.tl().tl().hd().sym_value() == "b"
 
+  with pytest.raises(JamError):
+    levels = term_list([make_int(1), make_int(1)])
+    terms = term_list([term_list([make_int(n) for n in range(1)]),
+                       term_list([make_int(n) for n in range(2)])])
+    decompose_values(levels, terms)
 
 # INV: levels contains at least one non-atomic level
 @jit.unroll_safe
@@ -799,7 +804,6 @@ def equal_lengths(levels, terms):
     term = W_TermList(term)
     if length == -1:
       length = len(term)
-    else:
       continue
     if length != len(term):
       return False
