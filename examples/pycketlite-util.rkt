@@ -64,14 +64,16 @@
       [(? vector?)
        #`(#%plain-app
           vector-immutable
-          #,@(for/list ([sub (in-vector v)]) (reflect sub)))]
+          #,@(map reflect (vector->list v))
+          #;#,@(for/list ([sub (in-vector v)]) (reflect sub)))]
 
       [(? null?) #'null]
 
       [(? list?)
        #`(#%plain-app
           list
-          #,@(for/list ([sub (in-list v)]) (reflect sub)))]
+          #,@(map reflect v)
+          #;#,@(for/list ([sub (in-list v)]) (reflect sub)))]
       [(? datum?) #`(quote #,v)]))
 
   (reflect (syntax->datum (cadr (syntax-e q)))))
@@ -152,7 +154,18 @@
 
 (module+ main
   (require jam/term-to-json json)
+
+  (define write-pycketlite/json (compose write-json term-to-json))
+  (define write-pycketlite/pretty pretty-write)
+
+  (define term-writer (make-parameter write-pycketlite/json))
+
   (command-line
+   #:once-any
+   [("-p" "--pretty") "Neatly write the terms to stdout"
+                      (term-writer write-pycketlite/pretty)]
+   [("-j" "--json") "Write the JSON representation of the terms to stdout"
+                    (term-writer write-pycketlite/json)]
    #:args (path)
-   (void (write-json (term-to-json (path->pycketlite path))))))
+   (void ((term-writer) (path->pycketlite path)))))
 
