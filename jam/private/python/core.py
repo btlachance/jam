@@ -633,6 +633,16 @@ def make_symbol(s):
     SymbolCache[s] = sym
   return sym
 
+FormalsCache = { }
+@jit.elidable
+def make_formals(formals_str):
+  formals = FormalsCache.get(formals_str, None)
+  if formals is None:
+    formals = term_list([make_symbol(s) for s in formals_str.split(formals_sep)])
+    FormalsCache[formals_str] = formals
+  return formals
+formals_sep = "\0"
+
 def make_integer(n):
   return W_Integer(n)
 
@@ -1077,9 +1087,13 @@ def environment_extend(t):
     bail("can't extend environment with two lists of unequal length")
 
   if xs.static:
-    return W_MultipleEnvironment(xs, vs, env)
+    formals = xs
   else:
-    return W_MultipleEnvironmentDynamic(xs, vs, env)
+    formals_str = formals_sep.join([x.sym_value() for x in W_TermList(xs)])
+    jit.promote_string(formals_str)
+    formals = make_formals(formals_str)
+
+  return W_MultipleEnvironment(formals, vs, env)
 
 @jit.unroll_safe
 def environment_empty(t):
