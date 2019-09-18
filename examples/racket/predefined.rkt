@@ -17,8 +17,13 @@
 (define (<= v1 v2) (or (< v1 v2) (= v1 v2)))
 (define (> v1 v2) (not (<= v1 v2)))
 (define (>= v1 v2) (<= v2 v1))
+
 (define (positive? n)
   (> n (if (exact-integer? n)
+           0
+           0.0)))
+(define (negative? n)
+  (< n (if (exact-integer? n)
            0
            0.0)))
 (define (abs n)
@@ -86,11 +91,11 @@
                               (raise)))))))))
 
 (define (time-apply f vs)
-    (let* ([then (current-inexact-milliseconds)]
-           [results (call-with-values (lambda () (apply f vs)) list)]
-           [now (current-inexact-milliseconds)])
-      (define delta (inexact->exact (- now then)))
-      (values results delta 0 delta)))
+  (let ([then (current-inexact-milliseconds)]
+        [results (call-with-values (lambda () (apply f vs)) list)]
+        [now (current-inexact-milliseconds)])
+    (define delta (inexact->exact (- now then)))
+    (values results delta delta 0)))
 
 (define (write v)
   (if (string? v)
