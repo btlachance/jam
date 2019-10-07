@@ -139,7 +139,7 @@
        (e_else xi phi rho k)]
 
   [--> (v xi phi rho (whilek e_test e_body k))
-       (e_body xi phi rho (begink* (e_test) (whilek e_test e_body)))
+       (e_body xi phi rho (begink* (e_test) (whilek e_test e_body k)))
        (where #f (integer-= v 0))]
 
   [--> (0 xi phi rho (whilek _ _ k))
@@ -177,6 +177,11 @@
                          it
                          it))
               0)
+  (test-equal (run-eval ((define f (x) (set x (+ x (int 1))))
+                         (val x (int 0))
+                         (set x (int 1))
+                         (f (+ x (+ (int 9) x)))))
+              12)
   (test-equal (run-eval ((define second (x y) y)
                          (second (int 1) (int 2))))
               2)
@@ -188,6 +193,11 @@
                          (f (int 2))
                          x))
               0)
+  (test-equal (run-eval ((val x (int 10))
+                         (while x
+                           (set x (- x (int 1))))
+                         x))
+              0)
   (test-equal
    ;; test poplocalenv* dropping the right environment for tail calls
    (run-eval ((val x (int 5))
@@ -196,6 +206,14 @@
                 (g (set x (+ x (int 1)))))
               (+ (f (int 10)) x)))
    16)
+
+  (test-equal
+   (run-eval ((define fact (n)
+                (if n
+                    (* n (fact (- n (int 1))))
+                    (int 1)))
+              (fact (int 5))))
+   120)
   (test-equal (run-eval ((+ (int 1) (int 2))))
               3)
   (jam-test))
