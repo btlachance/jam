@@ -12,7 +12,7 @@
          e)
 
   (e ::= x (int v) (x e ...) (if e e e)
-     (while e e) (set x e) (begin e ...))
+         (while e e) (set x e) (begin e ...))
 
   (x ::= variable-not-otherwise-mentioned)
   (v ::= integer)
@@ -30,7 +30,7 @@
      (begink (e e ...) k))
 
   (r ::= (last-result v)
-     (no-result)))
+         (no-result)))
 
 (define-metafunction impcore
   [(apply-prim #%+ v_1 v_2) (integer-add v_1 v_2)]
