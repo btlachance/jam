@@ -235,6 +235,7 @@
         'ExnTestSuccess 'ExnTestSuccess
         'ExnTestFailure 'ExnTestFailure
         'list_reverse 'list_reverse
+        'lists_have_same_length 'lists_have_same_length
         'integer_add0 'integer_add0
         'integer_subtract0 'integer_subtract0
         'integer_multiply0 'integer_multiply0

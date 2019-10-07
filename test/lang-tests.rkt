@@ -377,3 +377,12 @@
   (current-test-language store)
   (test-equal (store-test (store-empty)) ())
   (jam-test))
+
+(define-language lists)
+(module+ test
+  (current-test-language lists)
+  (test-equal (same-length? () ()) #t)
+  (test-equal (same-length? (a) (1)) #t)
+  (test-equal (same-length? (a) ()) #f)
+  (test-equal (same-length? () (0)) #f)
+  (jam-test))

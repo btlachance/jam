@@ -425,6 +425,9 @@
    (metafunction
     'reverse
     (mf:data 'list_reverse (repeat-pattern '_)))
+   (metafunction
+    'same-length?
+    (mf:data 'lists_have_same_length (pattern-of-ps (list (repeat-pattern '_) (repeat-pattern '_)))))
 
    (metafunction
     'integer-add

@@ -1044,6 +1044,13 @@ def list_reverse(t):
   args.reverse()
   return term_list(args)
 
+@jit.unroll_safe
+def lists_have_same_length(t):
+  [xs, ys] = [t for t in W_TermList(t)]
+  while not xs.is_nil() and not ys.is_nil():
+    xs, ys = xs.tl(), ys.tl()
+  return make_boolean(xs.is_nil() and ys.is_nil())
+
 def clock_milliseconds(t):
   [] = [x for x in W_TermList(t)]
   return make_integer(int(time.clock() * 1000))
