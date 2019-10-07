@@ -49,10 +49,6 @@
 
 (define-metafunction impcore
   [(poplocalenv* _ (poplocalenv rho k))
-   ;; XXX I'm unsure which of the two can't actually be observed? But
-   ;; this is as close as we can get to some sort of space savings for
-   ;; function calls without changing everything to use a store or
-   ;; some other sort of global source of unique things
    (poplocalenv* rho k)]
 
   [(poplocalenv* rho k)
@@ -192,6 +188,14 @@
                          (f (int 2))
                          x))
               0)
+  (test-equal
+   ;; test poplocalenv* dropping the right environment for tail calls
+   (run-eval ((val x (int 5))
+              (define g (x) x)
+              (define f (x)
+                (g (set x (+ x (int 1)))))
+              (+ (f (int 10)) x)))
+   16)
   (test-equal (run-eval ((+ (int 1) (int 2))))
               3)
   (jam-test))
