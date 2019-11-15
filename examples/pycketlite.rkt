@@ -1021,6 +1021,21 @@
       (['source p])
       (check-equal? (get-output-string out) (get-expect p)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Run
+;;      racket pycketlite.rkt --build --plain
+;;  
+;;  Then hack up pycketlite/pl_evaluator.py by copying the Python mess
+;;  below, and replacing everything in pycketlite/pl_evaluator.py from
+;;  the definition of eval_driver down with the copied Python mess.
+;;  
+;;  Then, translate the binary by running
+;;      (cd pycketlite && JAM_BINARY_NAME=eval rpython -Ojit target.py)
+;;
+;;  Run a foo.rkt using the translated binary by running
+;;      racket pycketlite.rkt --racket foo.rkt --translated
+
 #|
 def get_printable_location(c, prev_c, ret):
   if ret.is_none():
