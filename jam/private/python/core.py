@@ -402,6 +402,7 @@ def integer_divmod(t):
   q, r = v1.divmod(v2)
   return term_list([q, r])
 
+@jit.unroll_safe
 def integer_equal(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return make_boolean(v1.atoms_equal(v2))
@@ -437,26 +438,32 @@ def real_divmod(t):
   q, r = v1.divmod(v2)
   return term_list([q, r])
 
+@jit.unroll_safe
 def real_equal(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return make_boolean(v1.atoms_equal(v2))
 
+@jit.unroll_safe
 def real_lt(t):
   [v1, v2] = [v for v in W_TermList(t)]
   return make_boolean(v1.real_value() < v2.real_value())
 
+@jit.unroll_safe
 def integer_of_real(t):
   [r] = [v for v in W_TermList(t)]
   return make_integer(int(r.real_value()))
 
+@jit.unroll_safe
 def real_of_integer(t):
   [i] = [v for v in W_TermList(t)]
   return make_real(float(i.int_value()))
 
+@jit.unroll_safe
 def integer_string(t):
   [i] = [v for v in W_TermList(t)]
   return make_string(i.to_toplevel_string())
 
+@jit.unroll_safe
 def real_string(t):
   [r] = [v for v in W_TermList(t)]
   return make_string(r.to_toplevel_string())
@@ -466,14 +473,17 @@ def real_sin(t):
   [r] = [v for v in W_TermList(t)]
   return r.sin()
 
+@jit.unroll_safe
 def string_append(t):
   [s1, s2] = [x for x in W_TermList(t)]
   return s1.append(s2)
 
+@jit.unroll_safe
 def string_length(t):
   [s] = [x for x in W_TermList(t)]
   return make_integer(s.length())
 
+@jit.unroll_safe
 def string_equal(t):
   [s1, s2] = [x for x in W_TermList(t)]
   return make_boolean(s1.string_value() == s2.string_value())
@@ -1208,15 +1218,18 @@ def immutable_sequence_of(t):
   xs = [x for x in W_TermList(t)]
   return W_ImmutableSequence(xs)
 
+@jit.unroll_safe
 def sequence_element_at(t):
   [seq, i] = [x for x in W_TermList(t)]
   return seq.element_at(i.int_value())
 
+@jit.unroll_safe
 def sequence_set(t):
   [seq, i, x] = [x for x in W_TermList(t)]
   seq.set(i.int_value(), x)
   return make_nil()
 
+@jit.unroll_safe
 def sequence_length(t):
   [seq] = [x for x in W_TermList(t)]
   return make_integer(seq.length())
