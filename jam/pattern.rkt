@@ -700,6 +700,18 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
   (define handle (grammar-handle lang-id))
   (define (compile/g p) (compile/guard p lang-id (lexical-var* 't)))
   (define (nt-fun guards) (proc* '(t) `(or ,@(map compile/g guards))))
+  (define (error-if-not-same-prim key ir1 ir2)
+    (match* (ir1 ir2)
+      [(`(prim-procedure ,name1) `(prim-procedure ,name2))
+       #:when (equal? name1 name2)
+       ir1]
+      [(_ _)
+       (raise-arguments-error
+        'compile-nonterminal-predicate
+        "same key was mapped to two different ir"
+        "key" key
+        "ir" ir1
+        "ir" ir2)]))
 
   ;; for nonterminals with more than 1 name, we emit multiple entries
   ;; but only the first one has the compiled pattern code; the
@@ -731,7 +743,13 @@ contains at least one variable with nonzero ellipses depth\n  template: ~a\n  de
   (define grammar-functions
     (apply hash-union
            (hash terminal?-name (nt-fun terminals))
-           (map compile-nonterminal-predicate namess reps)))
+           (map compile-nonterminal-predicate namess reps)
+           ;; Want to support multiple uses of the same built-in eg
+           ;; for two different kinds of environments (the Impcore
+           ;; spec needs this) and since I want to include a reference
+           ;; to the prim that's used by the nonterminal predicate, I
+           ;; need some way to allow it to be included multiple times.
+           #:combine/key error-if-not-same-prim))
 
   (values
    handle
