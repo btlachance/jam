@@ -45,6 +45,8 @@
   (begin
     (struct name ir (fields ...)
       #:transparent
+      ;; XXX Any reason to not put the generic methods on the parent
+      ;; struct?
       #:methods gen:annotatable
       [(define (annotate target key value)
          (define new-ann (set-ann target key value))

@@ -906,6 +906,46 @@ def string_to_term(s):
     adapted = pja.adapt(json.loads(s))
     return json_to_term(adapted)
 
+# XXX I think I can change the linked environment representation to
+# look like something Pycket's, which will reduce the number of guards
+# in traces of variable lookup. Pycket can do this because it stores
+# the static scope information separate from the environment. So, for
+#
+#     (let ([x #t] [z #f] [a #t])
+#       (let ([y #f] [w #f])
+#         e)))
+#
+# imagine the environment for e, call it env0, has the values of y and
+# w directly in it, and env0 has a link to another environment, env1,
+# that has values of x z and a directly in it. What I'm calling the
+# static scope information looks like
+#
+#    '(([y 0] [w 1])
+#      ([x 0] [z 1] [a 2]))
+#
+# We can compute that entire static scope chain based off of how the
+# environment is extended, and we can use a cache to make sure that
+# it's constant.
+#
+# Treating the entire chain as one constant helps because then when we
+# lookup we just incur the cost of one guard on the particular
+# chain. Lookup now tells us how many links to traverse and, once
+# we've traversed those links, the offset of the value into the
+# environment's list of values.
+#
+# Before, lookup just looked at the current environment's list of
+# variables and told us whether a variable was bound in the current
+# environment. And we specialized the lookup against the list of
+# variables.  If the variable wasn't found, lookup traversed the
+# environment's link and recurred on that environment. Since each
+# lookup specializes against the list of variables, and we examined a
+# list of variable for each environment lookup consulted, there was a
+# guard for each list of variables.
+#
+# There's still a cost to traversing the links, but that is the price
+# we pay for environments with sharing. That cost can probably be made
+# worst-case logarithmic instead of linear in the number of links but
+# I haven't looked into that yet.
 class W_Environment(W_Term):
   def is_nil(self):
     return False
