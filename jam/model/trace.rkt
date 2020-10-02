@@ -201,9 +201,9 @@
 
 (define rewrite-trace-e
   (match-lambda
-    [(list _ _ C a b f r e v body _)
+    [(list _ _ C b f r e v body _)
      `(""
-       ,@(add-between (list C a b f r) ",")
+       ,@(add-between (list C b f r) ",")
        "⊢"
        ,e
        "⇓"
@@ -212,63 +212,63 @@
        ,body)]))
 
 (define-judgment-form trace
-                   ;; C,a,b,ϕ,ρ⊢e⇓v,body
-  #:contract (trace-e C a b f r e v body)
-      #:mode (trace-e I I I I I I O O)
+                   ;; C,b,ϕ,ρ⊢e⇓v,body
+  #:contract (trace-e C b f r e v body)
+      #:mode (trace-e I I I I I O O)
 
   [------------------------ "T-Variable"
-   (trace-e C a b f r x (basil-lookup r x) (lookup a (quote x) b))]
+   (trace-e C b f r x (basil-lookup r x) (lookup ρ (quote x) b))]
 
   [------------------------ "T-Literal"
-   (trace-e C a b f r (lit v) v (lit v b))]
+   (trace-e C b f r (lit v) v (lit v b))]
 
-  [(fresh-var/prefix b b_1) (trace-e C a b_1 f r e_1 #t  body_1) (trace-e C a b   f r e_2 v_2 body_2)
+  [(fresh-var/prefix b b_1) (trace-e C b_1 f r e_1 #t body_1) (trace-e C b f r e_2 v_2 body_2)
 
    (fresh-var y)
    (where body (let ([b_1 (lambda (y)
-                            (guard y #t (lambda () (exit (quote e_3) a b)))
+                            (guard y #t (lambda () (exit (quote e_3) ρ b)))
                             body_2)])
                  body_1))
    ------------------------------------------- "T-IfTrue"
-   (trace-e C a b f r (if e_1 e_2 e_3) v_2 body)]
+   (trace-e C b f r (if e_1 e_2 e_3) v_2 body)]
 
-  [(fresh-var/prefix b b_1) (trace-e C a b_1 f r e_1 #f  body_1) (trace-e C a b   f r e_3 v_3 body_3)
+  [(fresh-var/prefix b b_1) (trace-e C b_1 f r e_1 #f body_1) (trace-e C b f r e_3 v_3 body_3)
 
    (fresh-var y)
    (where body (let ([b_1 (lambda (y)
-                            (guard y #f (lambda () (exit (quote e_2) a b)))
+                            (guard y #f (lambda () (exit (quote e_2) ρ b)))
                             body_3)])
                  body_1))
    ------------------------------------------- "T-IfFalse"
-   (trace-e C a b f r (if e_1 e_2 e_3) v_3 body)]
+   (trace-e C b f r (if e_1 e_2 e_3) v_3 body)]
 
   [(basil-function-lookup f x ((x_n ..._1) e))
 
-   (fresh-var/prefix b b_0) (trace-e C a b_0 f r e_n v_n body_n) ...
+   (fresh-var/prefix b b_0) (trace-e C b_0 f r e_n v_n body_n) ...
 
-   (fresh-var/prefix a a_e) (trace-e C a_e b f (basil-extend r (x_n v_n) ...) e v body_e)
+   (trace-e C b f (basil-extend r (x_n v_n) ...) e v body_e)
 
    (fresh-vars/prefix (x_n ...) ,'y (y_n ...))
 
    ;; XXX if every call is to the nearest enclosing continuation,
    ;; might only need one b_n here?
    (where body (seq-bodies-then (body_n ...) b_0 (y_n ...)
-                                (let ([a_e (extend a (['x_n y_n] ...))])
+                                (let ([ρ (extend ρ (['x_n y_n] ...))])
                                   body_e)))
    -------------------------------------- "T-AppUser"
-   (trace-e C a b f r (app x e_n ..._1) v body)]
+   (trace-e C b f r (app x e_n ..._1) v body)]
 
   )
 
 (module+ test
-  (judgment-holds (trace-e () ρ k () ((x 0)) x 0 body) body)
-  (judgment-holds (trace-e () ρ k () ((x 0)) (lit #t) #t body) body)
-  (judgment-holds (trace-e () ρ k () ((x #t)) x #t body) body)
-  (judgment-holds (trace-e () ρ k () ((x #t)) (if x (lit 0) (lit 1)) 0 body) body)
+  (judgment-holds (trace-e () κ () ((x 0)) x 0 body) body)
+  (judgment-holds (trace-e () κ () ((x 0)) (lit #t) #t body) body)
+  (judgment-holds (trace-e () κ () ((x #t)) x #t body) body)
+  (judgment-holds (trace-e () κ () ((x #t)) (if x (lit 0) (lit 1)) 0 body) body)
 
-  (judgment-holds (trace-e () ρ k ((f (x) (if x (lit 0) (lit 1)))) ((x #t)) (app f x) 0 body) body)
+  (judgment-holds (trace-e () κ ((f (x) (if x (lit 0) (lit 1)))) ((x #t)) (app f x) 0 body) body)
 
-  (judgment-holds (trace-e () ρ k ((g (x y) (if (lit #t) x y))) ((w 0) (v 1)) (app g w v) 0 body) body))
+  (judgment-holds (trace-e () κ ((g (x y) (if (lit #t) x y))) ((w 0) (v 1)) (app g w v) 0 body) body))
 
 (define (call-with-trace-rewriters proc)
   (parameterize ([non-terminal-style '(italic . swiss)]
