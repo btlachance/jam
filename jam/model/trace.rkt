@@ -14,11 +14,20 @@
 
 (define-extended-language trace-target trace-source
   ;; trace language
+
+  ;; I want every call in the trace language to either be a prim call
+  ;; or a trace call, and (m m ...) as a body is a little too general,
+  ;; it allows arbitrary variables, lambdas, and values in the
+  ;; function position---a type system could rule that out, sure, but
+  ;; I'll just make the syntax a little clearer. (For trace calls, I
+  ;; need a separate syntactic form then, e.g. a new form of q for
+  ;; naming a trace or a different call form)
+
   (     m ::= a w lam (extend a (['x a] ...)))
   (     w ::= v (quote e))
   (     q ::= p lookup lit exit guard)
   ( a b y ::= variable-not-otherwise-mentioned)
-  (  body ::= (let ([a m]) body) (q m ...) (m m ...))
+  (  body ::= (let ([a m]) body) (q m ...))
   (   lam ::= (lambda (a) body body ...) (lambda () body body ...))
 
   (     t ::= (lambda (a b) body))
@@ -50,23 +59,23 @@
                                            (lit 0 env k))])
                                  (lookup env (quote x) k1))))
 
-  ;; (add1 (if x 0 1))
-  (test-trace? (lambda (env k) (let ([k2 (lambda (v2) (add1 v2 k))])
+  ;; (integer? (if x 0 1))
+  (test-trace? (lambda (env k) (let ([k2 (lambda (v2) (integer? v2 k))])
                                  (let ([k1 (lambda (v1)
                                              (guard v1 #t (lambda () (exit (quote (lit 1)) env k2)))
                                              (lit 0 env k2))])
                                    (lookup env (quote x) k1)))))
 
-  ;; (add1 x)
+  ;; (integer? x)
   (test-trace? (lambda (env k)
-                 (let ([k1 (lambda (v1) (add1 v1 k))])
+                 (let ([k1 (lambda (v1) (integer? v1 k))])
                    (lookup env (quote x) k1))))
 
-  ;; (f x) where (define f (x) (add1 x))
+  ;; (f x) where (define f (x) (integer? x))
   (test-trace? (lambda (env k)
                  (let ([k1 (lambda (v1)
                              (let ([env* (extend env (['x v1]))])
-                               (let ([k2 (lambda (v2) (add1 v2 k))])
+                               (let ([k2 (lambda (v2) (integer? v2 k))])
                                  (lookup env* (quote x) k2))))])
                    (lookup env (quote x) k1))))
   )
