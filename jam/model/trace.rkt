@@ -1,5 +1,5 @@
 #lang racket
-(require redex syntax/parse/define)
+(require redex syntax/parse/define pict)
 
 (define-language trace-source
   ;; object language
@@ -9,8 +9,34 @@
           cons car cdr + * -)
   (     e ::= x (app x e ...) (app p e ...) (if e e e) (lit v))
 
-  (     f ::= ((x (x ...) e) ...))
+  (     d ::= ((x (x ...) e) ...))
   (     r ::= ((x v) ...)))
+
+(define-metafunction trace-source
+  ;; TODO add more cases
+  [(apply-prim* cons v_1 v_2)
+   (cons v_1 v_2)]
+  [(apply-prim* null? '()) #t]
+  [(apply-prim* null? v) #f
+   (side-condition (not (null? (term v))))]
+  [(apply-prim* car (cons v_1 v_2)) v_1]
+  [(apply-prim* cdr (cons v_1 v_2)) v_2])
+
+(module+ test
+  (test-equal (term (apply-prim* null? 1)) #f)
+  (test-equal (term (apply-prim* null? '())) #t))
+
+(define-judgment-form trace-source
+  #:contract (apply-prim p (v ...) v)
+      #:mode (apply-prim I I       O)
+  [(where v_out (apply-prim* p v ...))
+   -------------------------------------
+   (apply-prim p (v ...) v_out)])
+
+(define rewrite-apply-prim
+  (match-lambda
+    [(list _ _ p vs v _)
+     (list "" "δ(" p "," vs ") = " v "")]))
 
 (define-extended-language trace-target trace-source
   ;; trace language
@@ -23,15 +49,15 @@
   ;; need a separate syntactic form then, e.g. a new form of q for
   ;; naming a trace or a different call form)
 
-  (     m ::= a w lam (extend a (['x a] ...)))
+  (     m ::= y w lam (extend env (['x y] ...)))
   (     w ::= v (quote e))
   (     q ::= p lookup lit exit guard)
-  ( a b y ::= variable-not-otherwise-mentioned)
-  (  body ::= (let ([a m]) body) (q m ...))
-  (   lam ::= (lambda (a) body body ...) (lambda () body body ...))
+  ( env cont y ::= variable-not-otherwise-mentioned)
+  (  body ::= (let ([y m]) body) (q m ...))
+  (   lam ::= (lambda (y) body body ...) (lambda () body body ...))
 
-  (     t ::= (lambda (a b) body))
-  (     C ::= ((a t) ...)))
+  (     t ::= (lambda (env cont) body))
+  (     C ::= ((y t) ...)))
 
 (define-union-language trace trace-source trace-target)
 
@@ -92,7 +118,13 @@
 
 (define-metafunction trace
   basil-lookup : r x -> v
-  [(basil-lookup ((x_0 v_0) ... (x v) (x_n v_n) ...) x) v])
+  [(basil-lookup ((x_0 v_0) ... (x v) (x_n v_n) ...) x) v
+   ;; r may contain multiple bindings for x, so match only the
+   ;; first instance of it, starting from the left
+   (side-condition (not (set-member? (term (x_0 ...)) (term x))))])
+
+(module+ test
+  (test-equal (term (basil-lookup ((xs 1) (xs 2)) xs)) 1))
 
 (define rewrite-basil-lookup
   (match-lambda
@@ -100,7 +132,7 @@
      (list "" r "(" x ")" "")]))
 
 (define-metafunction trace
-  basil-function-lookup* : f x -> ((x ...) e)
+  basil-function-lookup* : d x -> ((x ...) e)
   [(basil-function-lookup*
     ((x_0 _ _) ... (x_fun (x_arg ...) e) (x_n _ _) ...)
     x_fun)
@@ -111,33 +143,28 @@
               (term ((x) (app + x (lit 1))))))
 
 (define-judgment-form trace
-  #:contract (basil-function-lookup f x ((x ...) e))
+  #:contract (basil-function-lookup d x ((x ...) e))
       #:mode (basil-function-lookup I I O)
 
-  [(basil-function-lookup f x (basil-function-lookup* f x))])
+  [(basil-function-lookup d x (basil-function-lookup* d x))])
 
 (define rewrite-basil-function-lookup
   (match-lambda
-    [(list _ _ f x result _)
-     (list "" f "(" x ") = " result "")]))
+    [(list _ _ d x result _)
+     (list "" d "(" x ") = " result "")]))
   
 
-(define count 0)
-
- ;; not sure how to disable it just for this metafunction, so disable
- ;; all the caches!
-
 (define-judgment-form trace
-  #:contract (fresh-var a)
+  #:contract (fresh-var y)
       #:mode (fresh-var O)
   [------------------------
    (fresh-var (fresh-var*))])
 
 (define-judgment-form trace
-  #:contract (fresh-var/prefix a b)
+  #:contract (fresh-var/prefix y y)
       #:mode (fresh-var/prefix I O)
   [-----------------------------------
-   (fresh-var/prefix a (fresh-var* a))])
+   (fresh-var/prefix y (fresh-var* y))])
 
 (define rewrite-fresh-var
   (match-lambda
@@ -149,22 +176,26 @@
      (list "" var " fresh" "")]))
 
 (define-judgment-form trace
-  #:contract (fresh-vars/prefix (a ...) a (b ...))
+  #:contract (fresh-vars/prefix (any ...) y (y ...))
       #:mode (fresh-vars/prefix I       I O)
   [----------------------------------------------------------
-   (fresh-vars/prefix (a ...) b (fresh-vars/prefix* (a ...) b))])
+   (fresh-vars/prefix (any ...) y (fresh-vars/prefix* (any ...) y))])
 
+(define count 0)
+
+;; not sure how to disable it just for this metafunction, so disable
+;; all the caches!
 (caching-enabled? #f)
 (define-metafunction trace
   [(fresh-var*) (fresh-var* ,'t)]
-  [(fresh-var* a) ,(let ([prefix (string-trim (~a (term a)) #px"\\d+")])
+  [(fresh-var* y) ,(let ([prefix (string-trim (~a (term y)) #px"\\d+")])
                     (set! count (+ 1 count))
                     (string->symbol (format "~a~a" prefix count)))])
 
 ;; x_n many fresh-vars with prefix x
 (define-metafunction trace
-  [(fresh-vars/prefix* (x_n ...) x)
-   ,(map (lambda _ (term (fresh-var* x))) (term (x_n ...)))])
+  [(fresh-vars/prefix* (any ...) x)
+   ,(map (lambda _ (term (fresh-var* x))) (term (any ...)))])
 
 (define rewrite-fresh-vars/prefix
   (match-lambda
@@ -172,15 +203,15 @@
      (list "" vars " fresh and distinct" "")]))
 
 (define-metafunction trace
-  [(seq-bodies-then () b () body_e) body_e]
+  [(seq-bodies-then () () body_e) body_e]
 
-  [(seq-bodies-then (body body_n ...) b (y y_n ...) body_e)
-   (let ([b (lambda (y) (seq-bodies-then (body_n ...) b (y_n ...) body_e))])
+  [(seq-bodies-then (body body_n ...) (y y_n ...) body_e)
+   (let ([κ (lambda (y) (seq-bodies-then (body_n ...) (y_n ...) body_e))])
      body)])
 
 (module+ test
-  (test-match trace a (term (fresh-var*)))
-  (test-match trace a (term (fresh-var* b))))
+  (test-match trace y (term (fresh-var*)))
+  (test-match trace y (term (fresh-var* b))))
 
 
 ;; XXX define a form define-trace-judgment that defines a judgment
@@ -210,82 +241,111 @@
 
 (define rewrite-trace-e
   (match-lambda
-    [(list _ _ C b f r e v body _)
+    [(list _ _ C d r e v body _)
      `(""
-       ,@(add-between (list C b f r) ",")
+       ,@(add-between (list C d r) ",")
        "⊢"
        ,e
        "⇓"
        ,v
-       ","
+       "⇝"
        ,body)]))
 
 (define-judgment-form trace
-                   ;; C,b,ϕ,ρ⊢e⇓v,body
-  #:contract (trace-e C b f r e v body)
-      #:mode (trace-e I I I I I O O)
+                   ;; C,ϕ,ρ⊢e⇓v,body
+  #:contract (trace-e C d r e v body)
+      #:mode (trace-e I I I I O O)
 
   [------------------------ "T-Variable"
-   (trace-e C b f r x (basil-lookup r x) (lookup ρ (quote x) b))]
+   (trace-e C d r x (basil-lookup r x) (lookup ρ (quote x) κ))]
 
   [------------------------ "T-Literal"
-   (trace-e C b f r (lit v) v (lit v b))]
+   (trace-e C d r (lit v) v (lit v κ))]
 
-  [(fresh-var/prefix b b_1) (trace-e C b_1 f r e_1 #t body_1) (trace-e C b f r e_2 v_2 body_2)
+  [(trace-e C d r e_1 #t body_1) (trace-e C d r e_2 v_2 body_2)
 
    (fresh-var y)
-   (where body (let ([b_1 (lambda (y)
-                            (guard y #t (lambda () (exit (quote e_3) ρ b)))
+   (where body (let ([κ (lambda (y)
+                            (guard y #t (lambda () (exit (quote e_3) ρ κ)))
                             body_2)])
                  body_1))
    ------------------------------------------- "T-IfTrue"
-   (trace-e C b f r (if e_1 e_2 e_3) v_2 body)]
+   (trace-e C d r (if e_1 e_2 e_3) v_2 body)]
 
-  [(fresh-var/prefix b b_1) (trace-e C b_1 f r e_1 #f body_1) (trace-e C b f r e_3 v_3 body_3)
+  [(trace-e C d r e_1 #f body_1) (trace-e C d r e_3 v_3 body_3)
 
    (fresh-var y)
-   (where body (let ([b_1 (lambda (y)
-                            (guard y #f (lambda () (exit (quote e_2) ρ b)))
+   (where body (let ([κ (lambda (y)
+                            (guard y #f (lambda () (exit (quote e_2) ρ κ)))
                             body_3)])
                  body_1))
    ------------------------------------------- "T-IfFalse"
-   (trace-e C b f r (if e_1 e_2 e_3) v_3 body)]
+   (trace-e C d r (if e_1 e_2 e_3) v_3 body)]
 
   [(basil-function-lookup f x ((x_n ..._1) e))
 
-   (fresh-var/prefix b b_0) (trace-e C b_0 f r e_n v_n body_n) ...
+   (trace-e C d r e_n v_n body_n) ...
 
-   (trace-e C b f (basil-extend r (x_n v_n) ...) e v body_e)
+   (trace-e C d (basil-extend r (x_n v_n) ...) e v body_e)
 
    (fresh-vars/prefix (x_n ...) ,'y (y_n ...))
 
-   ;; XXX if every call is to the nearest enclosing continuation,
-   ;; might only need one b_n here?
-   (where body (seq-bodies-then (body_n ...) b_0 (y_n ...)
+   (where body (seq-bodies-then (body_n ...) (y_n ...)
                                 (let ([ρ (extend ρ (['x_n y_n] ...))])
                                   body_e)))
    -------------------------------------- "T-AppUser"
-   (trace-e C b f r (app x e_n ..._1) v body)]
+   (trace-e C d r (app x e_n ..._1) v body)]
+
+  [(trace-e C d r e v_n body_n) ...
+
+   (fresh-vars/prefix (e ...) ,'y (y_n ...))
+
+   (apply-prim p (v_n ...) v)
+
+   (where body (seq-bodies-then (body_n ...) (y_n ...)
+                                (p y_n ... κ)))
+   -------------------------------------- "T-AppPrim"
+   (trace-e C d r (app p e ...) v body)]
 
   )
 
 (module+ test
-  (judgment-holds (trace-e () κ () ((x 0)) x 0 body) body)
-  (judgment-holds (trace-e () κ () ((x 0)) (lit #t) #t body) body)
-  (judgment-holds (trace-e () κ () ((x #t)) x #t body) body)
-  (judgment-holds (trace-e () κ () ((x #t)) (if x (lit 0) (lit 1)) 0 body) body)
+  (judgment-holds (trace-e () () ((x 0)) x 0 body) body)
+  (judgment-holds (trace-e () () ((x 0)) (lit #t) #t body) body)
+  (judgment-holds (trace-e () () ((x #t)) x #t body) body)
+  (judgment-holds (trace-e () () ((x #t)) (if x (lit 0) (lit 1)) 0 body) body)
 
-  (judgment-holds (trace-e () κ ((f (x) (if x (lit 0) (lit 1)))) ((x #t)) (app f x) 0 body) body)
+  (judgment-holds (trace-e () ((f (x) (if x (lit 0) (lit 1)))) ((x #t)) (app f x) 0 body) body)
 
-  (judgment-holds (trace-e () κ ((g (x y) (if (lit #t) x y))) ((w 0) (v 1)) (app g w v) 0 body) body))
+  (judgment-holds (trace-e () ((g (x y) (if (lit #t) x y))) ((w 0) (v 1)) (app g w v) 0 body) body)
+
+  (test-judgment-holds (trace-e () () ((m 0)) (app cons m (lit 1)) (cons 0 1) body))
+  (test-judgment-holds (trace-e () () () (app cons (lit 1) (lit 2)) (cons 1 2) body))
+  (test-judgment-holds (trace-e () () () (app car (lit (cons 1 2))) 1 body))
+  (test-judgment-holds (trace-e () () () (app cdr (lit (cons 1 2))) 2 body))
+  (test-judgment-holds
+   (trace-e
+    ()
+    ((append (xs ys) (if (app null? xs)
+                         ys
+                         (app cons (app car xs)
+                              (app append (app cdr xs) ys)))))
+    ()
+    (app append (lit (cons 1 '())) (lit '()))
+    v
+    body))
+  )
 
 (define (call-with-trace-rewriters proc)
   (parameterize ([non-terminal-style '(italic . swiss)]
                  [literal-style 'modern])
     (with-atomic-rewriters
       (['r "ρ"]
-       ['f "ϕ"]
-       ['lambda "λ"])
+       ['d "ϕ"]
+       ['lambda "λ"]
+       ['env (lambda () (text "ρ" 'modern))]
+       ['cont (lambda () (text "κ" 'modern))]
+       #;['y (lambda () (text "y" 'modern))])
       (with-compound-rewriters
         (['trace-e rewrite-trace-e]
          ['basil-lookup rewrite-basil-lookup]
@@ -293,7 +353,8 @@
          ['basil-function-lookup rewrite-basil-function-lookup]
          ['fresh-var rewrite-fresh-var]
          ['fresh-var/prefix rewrite-fresh-var/prefix]
-         ['fresh-vars/prefix rewrite-fresh-vars/prefix])
+         ['fresh-vars/prefix rewrite-fresh-vars/prefix]
+         ['apply-prim rewrite-apply-prim])
         (proc)))))
 
 (define-simple-macro (with-trace-rewriters e ...)
@@ -302,11 +363,17 @@
 (module+ render
   (with-trace-rewriters
     (render-language trace-source "basil-language.pdf"
-                     #:nts '(e v p x f r))
+                     #:nts '(e v p x d r))
     (render-language trace-target "trace-language.pdf"
-                     #:nts '(m w q a b y body lam t C))
+                     #:nts '(m w q env cont y body lam t C))
     (render-metafunctions seq-bodies-then
                           #:file "trace-metafunctions.pdf")
-    (render-judgment-form trace-e "trace-judgment.pdf")))
+    (render-judgment-form trace-e "trace-judgment.pdf")
+    (render-term trace
+                 (let ((κ (lambda (y9)
+                            (let ((κ (lambda (y10) (cons y9 y10 κ))))
+                              (lit 1 κ)))))
+                   (lookup ρ 'm κ))
+                 "trace-exprim.pdf")))
 
 (provide with-trace-rewriters trace trace-e)
