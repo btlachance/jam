@@ -41,14 +41,6 @@
 (define-extended-language trace-target trace-source
   ;; trace language
 
-  ;; I want every call in the trace language to either be a prim call
-  ;; or a trace call, and (m m ...) as a body is a little too general,
-  ;; it allows arbitrary variables, lambdas, and values in the
-  ;; function position---a type system could rule that out, sure, but
-  ;; I'll just make the syntax a little clearer. (For trace calls, I
-  ;; need a separate syntactic form then, e.g. a new form of q for
-  ;; naming a trace or a different call form)
-
   ( env y ::= variable-not-otherwise-mentioned)
   (     f ::=
           y
@@ -68,15 +60,6 @@
 (module+ test
   (define-simple-macro (test-trace? e) (test-match trace t (term e)))
   (define-simple-macro (test-no-trace? e) (test-no-match trace t (term e)))
-
-  ;; Note: if prims can be curried, which they could be when body
-  ;; forms included (body a ...), then if we shuffle the arguments
-  ;; order for lookup, trace for x can just be
-  ;; 
-  ;;     (lookup 'x) = (lambda (env k) ((lookup 'x) env k))
-  ;;
-  ;; not sure if that pays off as a way to simplify other traces,
-  ;; though
 
   ;; x
   (test-trace? (lambda (env) (lookup env 'x)))
@@ -297,7 +280,7 @@
    (where f (let ([y_n f_n] ...)
               (p y_n ...)))
    -------------------------------------- "T-AppPrim"
-   (trace-e C d r (app p e ...) v body)]
+   (trace-e C d r (app p e ...) v f)]
 
   )
 
