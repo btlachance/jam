@@ -48,7 +48,7 @@
           (if y f f)
           (lit v)
           (lookup env 'x)
-          (let ([y f] [y f] ...) f)
+          (let ([y f] ...) f)
           (extend env (['x y] ...))
           (exit env 'e))
 
@@ -243,14 +243,14 @@
    (where f (let ([y f_1])
               (if y
                   f_2
-                  (exit ρ 'e_2))))
+                  (exit ρ 'e_3))))
    ------------------------------------------- "T-IfTrue"
    (trace-e C d r (if e_1 e_2 e_3) v_2 f)]
 
   [(trace-e C d r e_1 #f f_1) (trace-e C d r e_3 v_3 f_3)
 
    (fresh-var y)
-   (where f (let ([y f_3])
+   (where f (let ([y f_1])
               (if y
                   (exit ρ 'e_2)
                   f_3)))
@@ -271,16 +271,16 @@
    -------------------------------------- "T-AppUser"
    (trace-e C d r (app x e_n ..._1) v f)]
 
-  [(trace-e C d r e v_n f_n) ...
+  [(trace-e C d r e_n v_n f_n) ...
 
-   (fresh-vars/prefix (e ...) ,'y (y_n ...))
+   (fresh-vars/prefix (e_n ...) ,'y (y_n ...))
 
    (apply-prim p (v_n ...) v)
 
    (where f (let ([y_n f_n] ...)
               (p y_n ...)))
    -------------------------------------- "T-AppPrim"
-   (trace-e C d r (app p e ...) v f)]
+   (trace-e C d r (app p e_n ...) v f)]
 
   )
 
@@ -319,7 +319,6 @@
        ['d "ϕ"]
        ['lambda "λ"]
        ['env (lambda () (text "ρ" 'modern))]
-       ['cont (lambda () (text "κ" 'modern))]
        #;['y (lambda () (text "y" 'modern))])
       (with-compound-rewriters
         (['trace-e rewrite-trace-e]
